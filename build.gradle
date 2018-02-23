@@ -26,6 +26,7 @@ buildscript {
 dependencies {
 //    compile "perses.games:kudens:1.1.3"
 	compile "org.jetbrains.kotlin:kotlin-stdlib-js:$kotlin_version"
+//	expectedBy project(":client-common")//todo
 }
 
 task jarSources(type: Jar) {

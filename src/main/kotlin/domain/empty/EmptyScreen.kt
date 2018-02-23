@@ -1,6 +1,5 @@
 package domain.empty
 
-import date
 import kuden.*
 
 class EmptyGameScreen:InputProcessor by EmptyInputProcessor(),Game(SizeType.FixedWidth(1200f,800f,1400f),RGBA(0f,0f,0.5f,0.5f)) {
@@ -19,6 +18,6 @@ class EmptyGameScreen:InputProcessor by EmptyInputProcessor(),Game(SizeType.Fixe
   override fun render() {
     sprites.draw(ImgSprite(ImgTexData("img/smiley.png")),x,y,scale = 0.3f)
     sprites.render()
-    drawText(300f,view.gameHeight/2f,"Hello!"+date(),font = "bold 30pt Arial",fillStyle = "rgba(255,255,0,0.75)")
+    drawText(300f,view.gameHeight/2f,"Hello!"+Gen.date(),font = "bold 30pt Arial",fillStyle = "rgba(255,255,0,0.75)")
   }
 }

@@ -13,7 +13,9 @@ public class GenBuildParams extends DefaultTask {
         try{
             BufferedWriter writer = new BufferedWriter(new FileWriter("./src/main/kotlin/Gen.kt"));
             String time = new SimpleDateFormat("HH:mm:ss dd-MMMM-yy").format(Calendar.getInstance().getTime());
-            writer.write ("fun date():String{return \"" + time + "\"}");
+            writer.write ("object Gen {\n");
+            writer.write ("fun date():String{return \"" + time + "\"}" + "\n");
+            writer.write ("}\n");
             writer.close();
         } catch (IOException e) {
             e.printStackTrace();

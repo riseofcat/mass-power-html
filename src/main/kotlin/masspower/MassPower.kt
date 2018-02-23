@@ -271,7 +271,9 @@ void main(void) {
     if(false) html.canvas2d.fillText(mem("totalJSHeapSize"),200.0,200.0)
     if(false) html.canvas2d.fillText(mem("usedJSHeapSize"),200.0,300.0)
     if(false) html.canvas2d.fillText(mem("jsHeapSizeLimit"),200.0,400.0)
+
     html.canvas2d.fillText("fps: $fps",200.0,500.0)
+    html.canvas2d.fillText(Gen.date(),200.0,550.0)
     gl.clearColor(0f,0f,0f,1f)//todo потестировать прозрачность fps
     gl.clear(WGL.COLOR_BUFFER_BIT)
     val imgData2 = ImgData(if(BIG_TEXTURE) "img/smiley.png" else "img/smiley_small_rect.png")
