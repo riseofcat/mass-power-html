@@ -1,0 +1,1 @@
+Если gradle модуль имеет parent, то во время выполения ./gradlew из директори модуля игнорируется buildSrc модуля, а берётся buildSrc parent-а. Но если переименовать build.gradlew и settings.gradle parent-а, то parent ставновится невиден и берётся buildSrc уже из модуля.
