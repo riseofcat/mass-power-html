@@ -1,6 +1,5 @@
 package masspower
 
-import common.*
 import kuden.*
 import org.khronos.webgl.*
 import org.w3c.dom.*
