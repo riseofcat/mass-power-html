@@ -1,16 +1,22 @@
 package com.riseofcat.common
 
-import kotlin.reflect.*
+actual class Common {
+  actual companion object {
+    actual fun <T> createConcurrentList():MutableList<T> {
+      return arrayListOf()
+    }
 
-actual fun Any.toJson():String {
-  return JSON.stringify(this)
-}
-actual inline fun <reified T:Any>String.fromJson():T {
-  return JSON.parse(this)
-}
-actual fun <T> createConcurrentList():MutableList<T> {
-  return arrayListOf()
-}
-actual fun <K,V> createConcurrentHashMap():MutableMap<K,V> {
-  return hashMapOf()
+    actual fun <K,V> createConcurrentHashMap():MutableMap<K,V> {
+      return hashMapOf()
+    }
+
+    actual fun toJson(obj:Any):String {
+      return JSON.stringify(obj)
+    }
+
+    actual inline fun <reified T> fromJson(str:String):T {
+      return JSON.parse(str)
+    }
+
+  }
 }
