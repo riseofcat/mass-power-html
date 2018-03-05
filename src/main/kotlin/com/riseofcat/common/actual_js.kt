@@ -1,5 +1,7 @@
 package com.riseofcat.common
 
+import kotlin.reflect.*
+
 actual class Common {
   actual companion object {
     actual fun <T> createConcurrentList():MutableList<T> {
@@ -14,7 +16,7 @@ actual class Common {
       return JSON.stringify(obj)
     }
 
-    actual inline fun <reified T> fromJson(str:String):T {
+    actual fun <T:Any> fromJson(str:String,clazz:KClass<T>):T {
       return JSON.parse(str)
     }
 
