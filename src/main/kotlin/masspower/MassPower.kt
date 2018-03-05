@@ -1,5 +1,6 @@
 package masspower
 
+import com.riseofcat.common.*
 import kuden.*
 import org.khronos.webgl.*
 import org.w3c.dom.*
