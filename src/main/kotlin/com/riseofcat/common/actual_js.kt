@@ -24,5 +24,8 @@ actual class Common {
       TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
     }
 
+    actual val timeMs:Long
+      get() = TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+
   }
 }
