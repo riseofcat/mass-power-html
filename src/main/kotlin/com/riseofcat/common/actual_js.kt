@@ -20,5 +20,9 @@ actual class Common {
       return JSON.parse(str)
     }
 
+    actual fun createWebSocket(host:String,port:Int,path:String):LibWebSocket {
+      TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+    }
+
   }
 }
