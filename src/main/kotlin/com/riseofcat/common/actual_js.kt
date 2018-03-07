@@ -27,5 +27,13 @@ actual class Common {
     actual val timeMs:Long
       get() = TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
 
+    actual fun getStackTraceString(t:Throwable):String? {
+      TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+    }
+
+    actual fun getCodeLineInfo(depth:Int):CharSequence {
+      TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+    }
+
   }
 }
