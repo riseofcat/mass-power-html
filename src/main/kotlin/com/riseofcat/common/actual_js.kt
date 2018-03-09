@@ -70,6 +70,7 @@ actual class Common {
     }
 
     actual fun <T:MayClone<T>> clone(obj:T):T {
+      TODO("kotlinx.serialization")
       return JSON.parse(JSON.stringify(obj))
     }
 
