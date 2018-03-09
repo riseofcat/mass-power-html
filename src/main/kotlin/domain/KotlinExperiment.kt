@@ -1,5 +1,7 @@
 package domain
 
+import com.riseofcat.share.*
+import kotlinx.serialization.*
 import org.khronos.webgl.*
 import kotlin.coroutines.experimental.*
 import kotlin.js.Math
@@ -835,6 +837,16 @@ fun testFirst() {
     println(::testLong)
     Int.MAX_VALUE
     breakpoint("Long and Int")
+  }.e {
+    @Serializable data class Data(val a: Int)
+    @Serializable data class Box<T>(val boxed: T)
+    val dataSerial:KSerializer<Data> = Data.serializer()
+    val boxedDataSerial:KSerializer<Box<Data>> = Box.serializer(dataSerial)
+    val boxedData = Box<Data>(Data(123))
+    val str = kotlinx.serialization.json.JSON.stringify(boxedDataSerial,boxedData)
+    val boxedData2 = kotlinx.serialization.json.JSON.parse(boxedDataSerial,str)
+    println("boxedData2.boxed.a = ${boxedData2.boxed.a}")
+    if(boxedData == boxedData2) println("boxedData == boxedData2")
   }
 }
 
