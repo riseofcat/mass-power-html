@@ -1,5 +1,6 @@
 package masspower
 
+import com.riseofcat.client.*
 import com.riseofcat.common.*
 import kuden.*
 import org.khronos.webgl.*
@@ -16,7 +17,6 @@ const val DYNAMIC_TEXTURE = true//default true +2 fps
 const val DEBUG_ERROR = false//default true +2 fps
 const val BIG_TEXTURE = false//default true +20 fps
 const val DYNAMIC_BLEND = true//не влияет на производительность
-const val COUNT = 100
 const val SCALE = 0.1f
 
 class TextureData(val vMatrix:Matrix4)
@@ -134,6 +134,7 @@ void main(void) {
   private val imgCache:MutableMap<ImgData,ImgCache> = hashMapOf()
   var mouseX:Float = 0f
   var mouseY:Float = 0f
+  val model = Model(Conf(5000))
 
   init {
     window.onfocus
@@ -282,13 +283,10 @@ void main(void) {
     val imgData = ImgData(if(BIG_TEXTURE) "img/smiley.png" else "img/smiley_small_rect_green.png")
     val scale = if(BIG_TEXTURE) SCALE else 8*SCALE
     mutableListOf(RenderData(500f,500f,scale,imgData)).apply {
-      addAll(
-        List(COUNT) {i->
-          val x = (400f+kotlin.math.sin((time*i))*300f).toFloat()
-          val y = (view.gameHeight/2.0+kotlin.math.cos((time/2.5*i))*300f).toFloat()
-          RenderData(x,y,scale,if(i%2==0) imgData2 else imgData)
-        })
-      add(RenderData(mouseX,mouseY,scale,imgData))
+      model.calcDisplayState()?.cars?.forEach {
+        RenderData(it.pos.x,it.pos.y,scale,imgData)
+      }
+      add(RenderData(mouseX,mouseY,scale,imgData2))
     }.forEach {
         val cache = imgCache[it.imgData] ?: ImgCache().apply {
           imgCache[it.imgData] = this

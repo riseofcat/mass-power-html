@@ -21,7 +21,7 @@ enum class Mode {
 }
 
 fun main(args:Array<String>) {
-  when(Mode.PERFORMANCE) {
+  when(Mode.MASS_POWER) {
     Mode.MASS_POWER->MassPower()
     Mode.EXPERIMENTS-> {
       testFirst()
