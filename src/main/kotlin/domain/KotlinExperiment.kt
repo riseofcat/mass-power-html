@@ -818,6 +818,23 @@ fun testFirst() {
     data class JsonObj(val a:String,val b:Float)
     val obj:JsonObj = JSON.parse("""{"a":"str", "b": 3.14}""")
     breakpoint("json obj")
+  }.e {
+    fun longValueMinus1(value:Long):Long {
+      return value-1
+    }
+    inline fun testLong() {
+      //ОЧЕНЬ ВАЖНЫЙ ТЕСТ !!! СМОТРЕТЬ НА ПОСЛЕДНИЕ 4 ЦИФРЫ. ОНИ НЕ ПРАВИЛЬНЫЕ LONG - 1 ПЛОХАЯ ОПЕРАЦИЯ !!!
+      val longMax:Long = Long.MAX_VALUE
+      println("longMax = $longMax")
+      println("longMax-1 = ${longValueMinus1(longMax)}")
+      val randomLong = Long.MAX_VALUE/6
+      println("randomLong = $randomLong")
+      println("randomLong-1 = ${longValueMinus1(randomLong)}")
+    }
+    testLong()
+    println(::testLong)
+    Int.MAX_VALUE
+    breakpoint("Long and Int")
   }
 }
 

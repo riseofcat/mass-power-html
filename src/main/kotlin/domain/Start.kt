@@ -6,10 +6,12 @@ import domain.fractal.*
 import domain.tetris.*
 import kuden.*
 import masspower.*
+import performance.*
 import kotlin.browser.*
 
 enum class Mode {
   MASS_POWER,
+  PERFORMANCE,
   DOT,
   EXPERIMENTS,
   EMPTY,
@@ -19,7 +21,7 @@ enum class Mode {
 }
 
 fun main(args:Array<String>) {
-  when(Mode.MASS_POWER) {
+  when(Mode.PERFORMANCE) {
     Mode.MASS_POWER->MassPower()
     Mode.EXPERIMENTS-> {
       testFirst()
@@ -33,5 +35,6 @@ fun main(args:Array<String>) {
     Mode.FRACTAL1->Fractal1(HTMLElements()).render()
     Mode.FRACTAL2->Fractal2(HTMLElements()).render()
     Mode.DOT->Dots(HTMLElements()).render()
+    Mode.PERFORMANCE->PerformanceTest()
   }
 }

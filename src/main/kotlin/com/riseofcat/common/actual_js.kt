@@ -1,5 +1,6 @@
 package com.riseofcat.common
 
+import kotlin.js.*
 import kotlin.reflect.*
 
 actual class Common {
@@ -25,7 +26,7 @@ actual class Common {
     }
 
     actual val timeMs:Long
-      get() = TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+      get() = Date().getTime().toLong()
 
     actual fun getStackTraceString(t:Throwable):String? {
       TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
