@@ -15,15 +15,6 @@ actual class Common {
       return hashMapOf()
     }
 
-    actual fun toJson(obj:Any):String {
-      return JSON.stringify(obj)
-    }
-
-    actual fun <T:Any> fromJson(str:String,clazz:KClass<T>):T {
-      val obj = JSON.parse<T>(str)
-      return obj
-    }
-
     actual fun createWebSocket(host:String,port:Int,path:String):LibWebSocket {
       val webSocket = WebSocket("ws://$host:$port/$path")
       webSocket.onopen
@@ -62,11 +53,11 @@ actual class Common {
       get() = Date().getTime().toLong()
 
     actual fun getStackTraceString(t:Throwable):String? {
-      return "todo js"
+      return "[js] ${t.message}"
     }
 
     actual fun getCodeLineInfo(depth:Int):CharSequence {
-      return "todo js"
+      return "[js]"
     }
 
     actual fun <T:MayClone<T>> clone(obj:T):T {
