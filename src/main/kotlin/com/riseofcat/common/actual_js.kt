@@ -3,7 +3,6 @@ package com.riseofcat.common
 import org.w3c.dom.*
 import org.w3c.dom.events.*
 import kotlin.js.*
-import kotlin.reflect.*
 
 actual class Common {
   actual companion object {
@@ -59,11 +58,5 @@ actual class Common {
     actual fun getCodeLineInfo(depth:Int):CharSequence {
       return "[js]"
     }
-
-    actual fun <T:MayClone<T>> clone(obj:T):T {
-      TODO("kotlinx.serialization")
-      return JSON.parse(JSON.stringify(obj))
-    }
-
   }
 }
