@@ -275,7 +275,7 @@ void main(void) {
 
     html.canvas2d.fillText("fps: $fps",200.0,500.0)
     html.canvas2d.fillText(Gen.date(),200.0,550.0)
-    html.canvas2d.fillText("pillarTimeS(10) = " + Lib.pillarTimeS(10f).toString(),200.0,600.0)
+    html.canvas2d.fillText("pillarTimeS(10) = " + lib.pillarTimeS(10f).toString(),200.0,600.0)
     gl.clearColor(0f,0f,0f,1f)//todo потестировать прозрачность fps
     gl.clear(WGL.COLOR_BUFFER_BIT)
     val imgData2 = ImgData(if(BIG_TEXTURE) "img/smiley.png" else "img/smiley_small_rect.png")
