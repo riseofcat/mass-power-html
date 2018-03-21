@@ -2,6 +2,7 @@ package masspower
 
 import com.riseofcat.client.*
 import com.riseofcat.common.*
+import com.riseofcat.share.mass.*
 import kuden.*
 import org.khronos.webgl.*
 import org.w3c.dom.*
@@ -17,12 +18,15 @@ const val DYNAMIC_TEXTURE = true//default true +2 fps
 const val DEBUG_ERROR = false//default true +2 fps
 const val BIG_TEXTURE = false//default true +20 fps
 const val DYNAMIC_BLEND = true//не влияет на производительность
-const val SCALE = 0.1f
+const val SCALE_SMALL = 0.1f
+const val IMG_SIZE_PX = 128//todo Важно для scale картинки
 
 class TextureData(val vMatrix:Matrix4)
 data class ImgData(val url:String)
 class ImgCache(var texture:MassPower.GameTexture? = null)
-data class RenderData(val x:Float,val y:Float,val scale:Float,val imgData:ImgData)
+data class RenderData(val x:Float,val y:Float,val gameSize:Float,val imgData:ImgData) {
+  val scale:Float get() = gameSize/IMG_SIZE_PX
+}
 abstract class View {
   abstract fun getWidth(aspectRation:Float):Float
   abstract fun getHeight(aspectRation:Float):Float
@@ -43,7 +47,7 @@ class FixedWidth(val width:Float,val minHeight:Float,val maxHeight:Float):View()
 data class Attr(val locationName:String,val numElements:Int)
 data class IterAttr(val attr:Attr,val location:Int,val offset:Int)
 
-class MassPower(val view:View = FixedWidth(1200f,800f,1400f)) {
+class MassPower(val view:View = FixedWidth(2000f,2000f,2000f)) {
   val html = HTMLElements()
   val gl get() = html.webgl
   val vertex = gl.compileShader(/*language=GLSL*/"""
@@ -135,6 +139,7 @@ void main(void) {
   var mouseX:Float = 0f
   var mouseY:Float = 0f
   val model = Model(Conf(5000))
+//  val model = Model(Conf(80, "mass-power.herokuapp.com"))
 
   init {
     window.onfocus
@@ -184,7 +189,13 @@ void main(void) {
       }
     }
     document.onclick = fun(event:Event) {
-      if(false) JsUtil.error("document.onclick")
+      if(event is MouseEvent) {
+        fun View.screenToGameCoordX(screenX:Float) = (screenX-borderLeft)*gameWidth/windowWidth//todo дублирование
+        fun View.screenToGameCoordY(screenY:Float) = gameHeight-(screenY-borderTop)*gameHeight/windowHeight
+        val x = view.screenToGameCoordX(event.getX(html.container).toFloat())
+        val y = view.screenToGameCoordY(event.getY(html.container).toFloat())
+        model.touch(XY(x, y))
+      }
     }
     document.onkeypress = fun(event:Event) {
       if(event is KeyboardEvent) {
@@ -279,14 +290,30 @@ void main(void) {
     html.canvas2d.fillText(ServerCommon.test(),200.0,600.0)
     gl.clearColor(0f,0f,0f,1f)//todo потестировать прозрачность fps
     gl.clear(WGL.COLOR_BUFFER_BIT)
-    val imgData2 = ImgData(if(BIG_TEXTURE) "img/smiley.png" else "img/smiley_small_rect.png")
-    val imgData = ImgData(if(BIG_TEXTURE) "img/smiley.png" else "img/smiley_small_rect_green.png")
-    val scale = if(BIG_TEXTURE) SCALE else 8*SCALE
-    mutableListOf(RenderData(500f,500f,scale,imgData)).apply {
-      model.calcDisplayState()?.cars?.forEach {
-        add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),scale,imgData))
+    val imgRed = ImgData(if(BIG_TEXTURE) "img/smiley.png" else "img/smiley_small_rect_red.png")
+    val imgGreen = ImgData(if(BIG_TEXTURE) "img/smiley.png" else "img/smiley_small_rect_green.png")
+    val imgBlue = ImgData(if(BIG_TEXTURE) "img/smiley.png" else "img/smiley_small_rect_blue.png")
+    val imgYellow = ImgData(if(BIG_TEXTURE) "img/smiley.png" else "img/smiley_small_rect_yellow.png")
+    val imgViolet = ImgData(if(BIG_TEXTURE) "img/smiley.png" else "img/smiley_small_rect_violet.png")
+    val imgGray = ImgData(if(BIG_TEXTURE) "img/smiley.png" else "img/smiley_small_rect_gray.png")
+    mutableListOf<RenderData>(/*RenderData(500f,500f,someWdthInGameCoords,imgGreen)*/).apply {
+      val state = model.calcDisplayState()
+      if(state != null) {
+        state.foods.forEach {
+          add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),it.radius*2,imgGray))
+        }
+        fun PlayerId.color():ImgData {
+          val list = listOf(imgRed,imgGreen,imgBlue,imgYellow,imgViolet)
+          return list[id%list.size]
+        }
+        state.reactive.forEach {
+          add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),it.radius*2,it.owner.color()))
+        }
+        state.cars.forEach {
+          add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),it.radius*2,it.owner.color()))
+        }
       }
-      add(RenderData(mouseX,mouseY,scale,imgData2))
+      add(RenderData(mouseX,mouseY,12f,imgViolet))
     }.forEach {
         val cache = imgCache[it.imgData] ?: ImgCache().apply {
           imgCache[it.imgData] = this
@@ -323,7 +350,7 @@ void main(void) {
             it.x,it.y,right,top,1f,1f,it.scale,0f,it.x,it.y,right,bottom,1f,0f,it.scale,0f,it.x,it.y,left,bottom,0f,0f,it.scale,0f)
         }
       }
-    if(false) imgCache[imgData]?.texture?.glTexture?.render(Mode.TRIANGLE,123.45f)//todo сделать рендер треугольника через другой shader
+    if(false) imgCache[imgGreen]?.texture?.glTexture?.render(Mode.TRIANGLE,123.45f)//todo сделать рендер треугольника через другой shader
     if(false) {//Раньше было так
       val MAX_MESH = 2000//default 20_000  Не зависит от количества рисуемых объектов
       val mesh = Float32Array(MAX_MESH-(MAX_MESH%(verticesBlockSize*3)))//mesh находился внутри GameTexture. 3 - для треугольника, а у нас может быть FAN
