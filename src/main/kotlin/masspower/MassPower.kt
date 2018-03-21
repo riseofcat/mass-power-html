@@ -284,7 +284,7 @@ void main(void) {
     val scale = if(BIG_TEXTURE) SCALE else 8*SCALE
     mutableListOf(RenderData(500f,500f,scale,imgData)).apply {
       model.calcDisplayState()?.cars?.forEach {
-        add(RenderData(it.pos.x,it.pos.y,scale,imgData))
+        add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),scale,imgData))
       }
       add(RenderData(mouseX,mouseY,scale,imgData2))
     }.forEach {

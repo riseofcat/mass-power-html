@@ -1,5 +1,6 @@
 package com.riseofcat.common
 
+import com.riseofcat.lib.*
 import org.w3c.dom.*
 import org.w3c.dom.events.*
 import kotlin.js.*
@@ -57,6 +58,12 @@ actual class Common {
 
     actual fun getCodeLineInfo(depth:Int):CharSequence {
       return "[js]"
+    }
+
+    actual fun measureNanoTime(block:()->Unit):Long {
+      val start = lib.time//todo считать в нано секундах
+      block()
+      return (lib.time - start).ms*1_000_000
     }
   }
 }
