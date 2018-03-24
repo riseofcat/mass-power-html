@@ -138,7 +138,8 @@ void main(void) {
   private val imgCache:MutableMap<ImgData,ImgCache> = hashMapOf()
   var mouseX:Float = 0f
   var mouseY:Float = 0f
-  val model = Model(Conf(5000))
+  val model:ClientModel? = ClientModel(Conf(5000))
+//  val model:ClientModel? = ClientModel(Conf(5000, "192.168.100.7"))
 //  val model = Model(Conf(80, "mass-power.herokuapp.com"))
 
   init {
@@ -194,7 +195,7 @@ void main(void) {
         fun View.screenToGameCoordY(screenY:Float) = gameHeight-(screenY-borderTop)*gameHeight/windowHeight
         val x = view.screenToGameCoordX(event.getX(html.container).toFloat())
         val y = view.screenToGameCoordY(event.getY(html.container).toFloat())
-        model.touch(XY(x, y))
+        model?.touch(XY(x, y))
       }
     }
     document.onkeypress = fun(event:Event) {
@@ -298,7 +299,7 @@ void main(void) {
     val imgViolet = ImgData(if(BIG_TEXTURE) "img/smiley.png" else "img/smiley_small_rect_violet.png")
     val imgGray = ImgData(if(BIG_TEXTURE) "img/smiley.png" else "img/smiley_small_rect_gray.png")
     mutableListOf<RenderData>(/*RenderData(500f,500f,someWdthInGameCoords,imgGreen)*/).apply {
-      val state = model.calcDisplayState()
+      val state = model?.calcDisplayState()
       if(state != null) {
         state.foods.forEach {
           add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),it.radius*2,imgGray))
@@ -314,7 +315,7 @@ void main(void) {
           add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),it.radius*2,it.owner.color()))
         }
       }
-      add(RenderData(mouseX,mouseY,12f,imgViolet))
+      add(RenderData(mouseX,mouseY,30f,imgViolet))
     }.forEach {
         val cache = imgCache[it.imgData] ?: ImgCache().apply {
           imgCache[it.imgData] = this
