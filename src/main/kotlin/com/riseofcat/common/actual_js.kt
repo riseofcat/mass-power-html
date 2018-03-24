@@ -61,9 +61,23 @@ actual class Common {
     }
 
     actual fun measureNanoTime(block:()->Unit):Long {
-      val start = lib.time//todo считать в нано секундах
-      block()
-      return (lib.time - start).ms*1_000_000
+      lib.debug {
+        val start = permormanceNowMs()
+        block()
+        val end:Double = permormanceNowMs()
+        val result = (end-start)*1_000_000
+        return result.toLong()
+      }
+      lib.releae {
+        val start = lib.time
+        block()
+        return (lib.time - start).ms*1_000_000
+      }
+      lib.log.fatalError("debug or release")
+    }
+
+    fun permormanceNowMs():Double {
+      return js("performance.now()")//todo только в debug
     }
   }
 }

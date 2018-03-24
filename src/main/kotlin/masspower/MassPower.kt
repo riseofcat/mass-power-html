@@ -285,6 +285,7 @@ void main(void) {
     if(false) html.canvas2d.fillText(mem("usedJSHeapSize"),200.0,300.0)
     if(false) html.canvas2d.fillText(mem("jsHeapSizeLimit"),200.0,400.0)
 
+//    html.canvas2d.fillText("average tick: ${(averageTickNanos/1000).toInt()}",200.0,450.0)
     html.canvas2d.fillText("fps: $fps",200.0,500.0)
     html.canvas2d.fillText(Gen.date(),200.0,550.0)
     html.canvas2d.fillText(ServerCommon.test(),200.0,600.0)
