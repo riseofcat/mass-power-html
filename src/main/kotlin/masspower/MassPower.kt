@@ -13,7 +13,7 @@ import kotlin.js.*
 import org.khronos.webgl.WebGLRenderingContext as WGL
 
 @Deprecated("") const val OLD = false
-const val DYNAMIC_SHADER = false//default true +1 fps
+const val DYNAMIC_SHADER = true//default true +1 fps
 const val DYNAMIC_TEXTURE = true//default true +2 fps
 const val DEBUG_ERROR = false//default true +2 fps
 const val BIG_TEXTURE = false//default true +20 fps
@@ -47,7 +47,7 @@ class FixedWidth(val width:Float,val minHeight:Float,val maxHeight:Float):View()
 data class Attr(val locationName:String,val numElements:Int)
 data class IterAttr(val attr:Attr,val location:Int,val offset:Int)
 
-class MassPower(val view:View = FixedWidth(2000f,2000f,2000f)) {
+class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {
   val html = HTMLElements()
   val gl get() = html.webgl
   val vertex = gl.compileShader(/*language=GLSL*/"""
@@ -125,6 +125,48 @@ void main(void) {
   gl_FragColor = myColor;
 }
 """,WGL.FRAGMENT_SHADER))
+
+  val shaderProgram3:WebGLProgram = gl.createWebGLProgram(
+    gl.compileShader(/*language=GLSL*/"""
+attribute vec2 a_position;
+attribute vec2 a_boundingBox;
+attribute vec2 a_texCoord;
+attribute float a_scale;
+attribute float a_rotation;
+attribute float a_divide;
+uniform mat4 u_projectionView;
+
+mat4 scale(float scale) {
+  return mat4(
+    vec4(scale, 0.0,   0.0,   0.0),
+    vec4(0.0,   scale, 0.0,   0.0),
+    vec4(0.0,   0.0,   scale, 0.0),
+    vec4(0.0,   0.0,   0.0,   1.0)
+  );
+}
+mat4 rotateZ(float angle) {
+  return mat4(
+    vec4(cos(angle),   sin(angle),  0.0,  0.0),
+    vec4(-sin(angle),  cos(angle),  0.0,  0.0),
+    vec4(0.0,          0.0,         1.0,  0.0),
+    vec4(0.0,          0.0,         0.0,  1.0)
+  );
+}
+void main(void) {
+  vec4 scaledBox = vec4(a_boundingBox, 1.0, 1.0) * scale(a_scale) * rotateZ(a_rotation);
+  gl_Position = u_projectionView * vec4(a_position + scaledBox.xy, 1.0, 1.0);
+  }
+""",WGL.VERTEX_SHADER),
+    gl.compileShader(/*language=GLSL*/
+      """
+precision mediump float;
+uniform sampler2D u_sampler;
+uniform lowp int u_test_array_size;
+uniform lowp vec4 u_vec_arr[gl_MaxVertexUniformVectors/2 - 5];
+void main(void) {
+  gl_FragColor = vec4(0.5,0.5,0.5,0.5);
+}
+""",WGL.FRAGMENT_SHADER))
   val attributes = listOf(Attr("a_position",2),Attr("a_boundingBox",2),Attr("a_texCoord",2),Attr("a_scale",1),Attr("a_rotation",1),Attr("a_divide",1)).run {
     val result = mutableListOf<IterAttr>()
     var currentSize = 0
@@ -150,7 +192,6 @@ void main(void) {
     window.requestAnimationFrame {
       gl.bindBuffer(WGL.ARRAY_BUFFER,gl.createBuffer() ?: JsUtil.error("Unable to create webgl buffer!"))
 
-
       gl.useProgram(shaderProgram)
       attributes.forEach {
         gl.enableVertexAttribArray(it.location)
@@ -161,7 +202,6 @@ void main(void) {
       gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram,"u_projectionView"),false,(TextureData(view.projectionMatrix)).vMatrix.toFloat32Arr())
       gl.uniform1i(gl.getUniformLocation(shaderProgram,"u_test_array_size"),5)
       gl.uniform1fv(gl.getUniformLocation(shaderProgram,"u_arr[0]"),arrayOf(0.1f,0.1f))
-
 
       if(DYNAMIC_SHADER) {
         gl.useProgram(shaderProgram2)
@@ -174,8 +214,15 @@ void main(void) {
         gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram2,"u_projectionView"),false,(TextureData(view.projectionMatrix)).vMatrix.toFloat32Arr())
         gl.uniform1i(gl.getUniformLocation(shaderProgram2,"u_test_array_size"),5)
         gl.uniform1fv(gl.getUniformLocation(shaderProgram2,"u_arr[0]"),arrayOf(0.1f,0.1f))
-      }
 
+        gl.useProgram(shaderProgram3)
+        attributes.forEach {
+          gl.enableVertexAttribArray(it.location)
+          gl.vertexAttribPointer(it.location,it.attr.numElements,WGL.FLOAT,false,/*шаг*/verticesBlockSize*4,it.offset*4)
+        }
+        gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram3,"u_projectionView"),false,(TextureData(view.projectionMatrix)).vMatrix.toFloat32Arr())
+        gl.uniform1i(gl.getUniformLocation(shaderProgram3,"u_test_array_size"),5)
+      }
 
       gl.enable(WGL.BLEND)
       if(!DYNAMIC_BLEND) gl.blendFunc(srcFactor,dstFactor)
@@ -298,8 +345,24 @@ void main(void) {
     val imgYellow = ImgData(if(BIG_TEXTURE) "img/smiley.png" else "img/smiley_small_rect_yellow.png")
     val imgViolet = ImgData(if(BIG_TEXTURE) "img/smiley.png" else "img/smiley_small_rect_violet.png")
     val imgGray = ImgData(if(BIG_TEXTURE) "img/smiley.png" else "img/smiley_small_rect_gray.png")
+
+    val state = model?.calcDisplayState()
+
+    if(DYNAMIC_SHADER) gl.useProgram(shaderProgram3)
+    if(true)state?.reactive?.forEach {
+      it.pos.x
+      val scl = 0.1f
+      renderCircle16(it.pos.x.toFloat(),it.pos.y.toFloat(),0f,0f,0.5f,0.5f,scl,0f,0f) {a->
+        val cos = kotlin.math.cos(a)
+        val sin = kotlin.math.sin(a)
+        val DIVIDE = 1.65f
+        val glowRadius = 0.75f
+        val size=it.radius*10
+        CircleFanStrip(floatArrayOf(it.pos.x.toFloat(),it.pos.y.toFloat(),cos*size/2,sin*size/2,cos*0.5f+0.5f,sin*0.5f+0.5f,size,0f,1f),
+          floatArrayOf(it.pos.x.toFloat(),it.pos.y.toFloat(),cos*size*glowRadius,sin*size*glowRadius,0.5f+cos*0.5f,0.5f+sin*0.5f,scl,0f,DIVIDE))
+      }
+    }
     mutableListOf<RenderData>(/*RenderData(500f,500f,someWdthInGameCoords,imgGreen)*/).apply {
-      val state = model?.calcDisplayState()
       if(state != null) {
         state.foods.forEach {
           add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),it.radius*2,imgGray))
@@ -308,7 +371,7 @@ void main(void) {
           val list = listOf(imgRed,imgGreen,imgBlue,imgYellow,imgViolet)
           return list[id%list.size]
         }
-        state.reactive.forEach {
+        if(false) state.reactive.forEach {
           add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),it.radius*2,it.owner.color()))
         }
         state.cars.forEach {
@@ -369,6 +432,30 @@ void main(void) {
   inline fun angle(i:Int,max:Int):Float = 2*kotlin.math.PI.toFloat()*i/max
   data class CircleFanStrip(val fan:FloatArray,val strip:FloatArray)
 
+  inline fun renderCircle16(vararg center:Float,fan:(angle:Float)->CircleFanStrip) {
+    val max = 4
+    val (f0,s0) = fan(angle(0,max))//todo расчёт до исполнения через companion object
+    val (f1,s1) = fan(angle(1,max))
+    val (f2,s2) = fan(angle(2,max))
+    val (f3,s3) = fan(angle(3,max))
+//    val (f4,s4) = fan(angle(4,max))
+//    val (f5,s5) = fan(angle(5,max))
+//    val (f6,s6) = fan(angle(6,max))
+//    val (f7,s7) = fan(angle(7,max))
+//    val (f8,s8) = fan(angle(8,max))
+//    val (f9,s9) = fan(angle(9,max))
+//    val (f10,s10) = fan(angle(10,max))
+//    val (f11,s11) = fan(angle(11,max))
+//    val (f12,s12) = fan(angle(12,max))
+//    val (f13,s13) = fan(angle(13,max))
+//    val (f14,s14) = fan(angle(14,max))
+//    val (f15,s15) = fan(angle(15,max))
+    if(DYNAMIC_BLEND) gl.blendFunc(srcFactor,dstFactor)
+    render(Mode.TRIANGLE_FAN,*center,*f0,*f1,*f2,*f3,/**f4,*f5,*f6,*f7,*f8,*f9,*f10,*f11,*f12,*f13,*f14,*f15,*/*f0)
+  }
+  inline fun render(mode:Mode,vararg allArgs:Float) = render(mode,allArgs)
+  inline fun render(mode:Mode,allArgs:FloatArray) = render(mode,if(true) allArgs as Float32Array else Float32Array(allArgs.toTypedArray()),null,allArgs.size)
+
   inline fun WebGLTexture.renderCircle16(vararg center:Float,fan:(angle:Float)->CircleFanStrip) {
     val max = 16
     val (f0,s0) = fan(angle(0,max))//todo расчёт до исполнения через companion object
@@ -391,7 +478,6 @@ void main(void) {
     if(DYNAMIC_SHADER) gl.useProgram(shaderProgram)
     render(Mode.TRIANGLE_FAN,*center,*f0,*f1,*f2,*f3,*f4,*f5,*f6,*f7,*f8,*f9,*f10,*f11,*f12,*f13,*f14,*f15,*f0)
     if(DYNAMIC_BLEND) gl.blendFunc(srcFactorGlow,dstFactorGlow)
-    if(DYNAMIC_SHADER) gl.useProgram(shaderProgram2)
     render(Mode.TRIANGLE_STRIP,*f0,*s0,*f1,*s1,*f2,*s2,*f3,*s3,*f4,*s4,*f5,*s5,*f6,*s6,*f7,*s7,*f8,*s8,*f9,*s9,*f10,*s10,*f11,*s11,*f12,*s12,*f13,*s13,*f14,*s14,*f15,*s15,*f0,*s0)
   }
 
@@ -399,11 +485,11 @@ void main(void) {
   inline fun WebGLTexture.render(mode:Mode,allArgs:FloatArray) = render(mode,if(true) allArgs as Float32Array else Float32Array(allArgs.toTypedArray()),this,allArgs.size)
   inline fun MutableList<Float>.vert(vararg args:Float) = addAll(args.toList())//todo check why asList doesn't working
   inline fun WebGLTexture.render(mode:Mode,lambda:MutableList<Float>.()->Unit) = render(mode,arrayListOf<Float>().also {it.lambda()}.toFloatArray())
-  inline fun render(mode:Mode,mesh:Float32Array,glTexture:WebGLTexture,allFloatArgsCount:Int) {
+  inline fun render(mode:Mode,mesh:Float32Array,glTexture:WebGLTexture?,allFloatArgsCount:Int) {
     debugError("allFloatArgsCount<=0") {allFloatArgsCount<=0}
     debugError("Number of vertices not a multiple of the attribute block size!") {allFloatArgsCount%verticesBlockSize!=0}
     gl.activeTexture(WGL.TEXTURE0)
-    if(DYNAMIC_TEXTURE) gl.bindTexture(WGL.TEXTURE_2D,glTexture)
+    if(glTexture != null) if(DYNAMIC_TEXTURE) gl.bindTexture(WGL.TEXTURE_2D,glTexture)
     if(OLD&&DYNAMIC_SHADER) gl.useProgram(shaderProgram)
     gl.bufferData(WGL.ARRAY_BUFFER,mesh,WGL.DYNAMIC_DRAW)//todo test STATIC_DRAW fps
     gl.drawArrays(mode.glMode,0,allFloatArgsCount/verticesBlockSize)//todo first, count
