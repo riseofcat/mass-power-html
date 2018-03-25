@@ -2,6 +2,7 @@ package masspower
 
 import com.riseofcat.client.*
 import com.riseofcat.common.*
+import com.riseofcat.lib.*
 import com.riseofcat.share.mass.*
 import kuden.*
 import org.khronos.webgl.*
@@ -12,15 +13,12 @@ import kotlin.browser.*
 import kotlin.js.*
 import org.khronos.webgl.WebGLRenderingContext as WGL
 
-@Deprecated("") const val OLD = false
 const val DYNAMIC_SHADER = true//default true +1 fps
 const val DYNAMIC_TEXTURE = true//default true +2 fps
-const val DEBUG_ERROR = false//default true +2 fps
-const val BIG_TEXTURE = false//default true +20 fps
 const val BLEND = true//не влияет на производительность
 const val DYNAMIC_BLEND = true//не влияет на производительность
 const val SCALE_SMALL = 0.1f
-const val IMG_SIZE_PX = 128//todo Важно для scale картинки
+const val IMG_SIZE_PX = 128//Важно для scale картинки
 
 class TextureData(val vMatrix:Matrix4)
 data class ImgData(val url:String)
@@ -165,7 +163,7 @@ uniform sampler2D u_sampler;
 uniform lowp int u_test_array_size;
 uniform lowp vec4 u_vec_arr[gl_MaxVertexUniformVectors/2 - 5];
 void main(void) {
-  gl_FragColor = vec4(0.2,0.2,0.2,0.5);
+  gl_FragColor = vec4(0.3,0.3,0.3,0.4);
 }
 """,WGL.FRAGMENT_SHADER))
   val attributes = listOf(Attr("a_position",2),Attr("a_boundingBox",2),Attr("a_texCoord",2),Attr("a_scale",1),Attr("a_rotation",1),Attr("a_divide",1)).run {
@@ -179,8 +177,7 @@ void main(void) {
   }
   val verticesBlockSize = attributes.sumBy {it.attr.numElements}
   private val imgCache:MutableMap<ImgData,ImgCache> = hashMapOf()
-  var mouseX:Float = 0f
-  var mouseY:Float = 0f
+  var mousePos:XY = XY()
   val model:ClientModel? = ClientModel(Conf(5000))
 //  val model:ClientModel? = ClientModel(Conf(5000, "192.168.100.7"))
 //  val model = Model(Conf(80, "mass-power.herokuapp.com"))
@@ -229,71 +226,27 @@ void main(void) {
       if(BLEND && !DYNAMIC_BLEND) gl.blendFunc(srcFactor,dstFactor)
       gameLoop(it)
     }
+
+    infix fun View.screenToGame(screen:XY) = XY((screen.x-borderLeft)*gameWidth/windowWidth, gameHeight-(screen.y-borderTop)*gameHeight/windowHeight)
     document.onmousemove = fun(event:Event) {
       if(event is MouseEvent) {
-        fun View.screenToGameCoordX(screenX:Float) = (screenX-borderLeft)*gameWidth/windowWidth
-        fun View.screenToGameCoordY(screenY:Float) = gameHeight-(screenY-borderTop)*gameHeight/windowHeight
-        mouseX = view.screenToGameCoordX(event.getX(html.container).toFloat())
-        mouseY = view.screenToGameCoordY(event.getY(html.container).toFloat())
+        mousePos = view screenToGame event.xy
       }
     }
     document.onclick = fun(event:Event) {
       if(event is MouseEvent) {
-        fun View.screenToGameCoordX(screenX:Float) = (screenX-borderLeft)*gameWidth/windowWidth//todo дублирование
-        fun View.screenToGameCoordY(screenY:Float) = gameHeight-(screenY-borderTop)*gameHeight/windowHeight
-        val x = view.screenToGameCoordX(event.getX(html.container).toFloat())
-        val y = view.screenToGameCoordY(event.getY(html.container).toFloat())
-        model?.touch(XY(x, y))
+        model?.touch(view screenToGame event.xy)
       }
     }
     document.onkeypress = fun(event:Event) {
       if(event is KeyboardEvent) {
         val code = event.keyCode
         val key = Key.getByCode(code)
-        when(key) {
-          Key.Q,Key.W,Key.E,Key.R->
-            modeKey = key
-          else->if(key?.number==true) {
-            val result = listOf(WGL.SRC_COLOR,//1
-              WGL.ONE_MINUS_SRC_COLOR,//2
-              WGL.DST_COLOR,//3
-              WGL.ONE_MINUS_DST_COLOR,//4
-              WGL.SRC_ALPHA,//5
-              WGL.ONE_MINUS_SRC_ALPHA,//6
-              WGL.DST_ALPHA,
-              WGL.ONE_MINUS_DST_ALPHA,
-              WGL.SRC_ALPHA_SATURATE).get(key.numValue-1)
-            when(modeKey) {
-              Key.Q->srcFactor = result
-              Key.W->dstFactor = result
-              Key.E->srcFactorGlow = result
-              Key.R->dstFactorGlow = result
-            }
-          }
-
-        }
       }
     }
   }
 
-  enum class Key(val code:Int,val number:Boolean = false) {
-    Q(113), W(119), E(101), R(114), T(116), Y(121),
-    ZERO(48,number = true), ONE(49,number = true), TWO(50,number = true), THREE(51,number = true), FOUR(52,number = true), FIVE(53,number = true), SIX(54,number = true), SEVEN(55,number = true), EIGHT(56,number = true), NINE(57,number = true)
-    ;
-
-    val numValue get() = code-48
-
-    companion object {
-      fun getByCode(code:Int):Key? {
-        for(value in values()) {
-          if(value.code==code) {
-            return value
-          }
-        }
-        return null
-      }
-    }
-  }
+  inline val MouseEvent.xy get() = XY(getX(html.container), getY(html.container))
 
   inner class GameTexture(val glTexture:WebGLTexture,val width:Int,val height:Int) {
     val left = -width/2f
@@ -317,11 +270,10 @@ void main(void) {
   val averageConst = 30
   var fps = 60f
 
-  private var modeKey:Key = Key.Q
-  public var srcFactorGlow = WGL.SRC_ALPHA
-  public var dstFactorGlow = if(true) WGL.DST_ALPHA else WGL.SRC_ALPHA_SATURATE //todo GL ERROR with false
-  public var srcFactor = WGL.SRC_ALPHA
-  public var dstFactor = WGL.ONE_MINUS_SRC_ALPHA
+  var srcFactorGlow = WGL.SRC_ALPHA
+  var dstFactorGlow = if(false) WGL.DST_ALPHA else WGL.ONE_MINUS_SRC_ALPHA
+  var srcFactor = WGL.SRC_ALPHA
+  var dstFactor = WGL.ONE_MINUS_SRC_ALPHA
 
   private fun gameLoop(милисекундСоСтараПлюсБездействие:Double):Unit = JsUtil.saveInvoke {
     fps = (fps*averageConst+1f/(time-previousTime)).toFloat()/(averageConst+1)
@@ -330,25 +282,19 @@ void main(void) {
     html.canvas2d.clearRect(0.0,0.0,view.gameWidth.toDouble(),view.gameHeight.toDouble())
     html.canvas2d.fillStyle = "white"
     html.canvas2d.font = "bold 24pt Arial"
-    if(false) html.canvas2d.fillText(mem("totalJSHeapSize"),200.0,200.0)
-    if(false) html.canvas2d.fillText(mem("usedJSHeapSize"),200.0,300.0)
-    if(false) html.canvas2d.fillText(mem("jsHeapSizeLimit"),200.0,400.0)
-
-//    html.canvas2d.fillText("average tick: ${(averageTickNanos/1000).toInt()}",200.0,450.0)
     html.canvas2d.fillText("fps: $fps",200.0,500.0)
     html.canvas2d.fillText(Gen.date(),200.0,550.0)
     html.canvas2d.fillText(ServerCommon.test(),200.0,600.0)
     gl.clearColor(0f,0f,0f,1f)//todo потестировать прозрачность fps
     gl.clear(WGL.COLOR_BUFFER_BIT)
-    val imgRed = ImgData(if(BIG_TEXTURE) "img/smiley.png" else "img/smiley_small_rect_red.png")
-    val imgGreen = ImgData(if(BIG_TEXTURE) "img/smiley.png" else "img/smiley_small_rect_green.png")
-    val imgBlue = ImgData(if(BIG_TEXTURE) "img/smiley.png" else "img/smiley_small_rect_blue.png")
-    val imgYellow = ImgData(if(BIG_TEXTURE) "img/smiley.png" else "img/smiley_small_rect_yellow.png")
-    val imgViolet = ImgData(if(BIG_TEXTURE) "img/smiley.png" else "img/smiley_small_rect_violet.png")
-    val imgGray = ImgData(if(BIG_TEXTURE) "img/smiley.png" else "img/smiley_small_rect_gray.png")
+    val imgRed = ImgData("img/smiley_small_rect_red.png")
+    val imgGreen = ImgData("img/smiley_small_rect_green.png")
+    val imgBlue = ImgData("img/smiley_small_rect_blue.png")
+    val imgYellow = ImgData("img/smiley_small_rect_yellow.png")
+    val imgViolet = ImgData("img/smiley_small_rect_violet.png")
+    val imgGray = ImgData("img/smiley_small_rect_gray.png")
 
     val state = model?.calcDisplayState()
-
     if(DYNAMIC_SHADER) gl.useProgram(shaderProgram3)
     if(true)state?.reactive?.forEach {
       it.pos.x
@@ -377,7 +323,7 @@ void main(void) {
           add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),it.radius*2,it.owner.color()))
         }
       }
-      add(RenderData(mouseX,mouseY,30f,imgViolet))
+      add(RenderData(mousePos.x.toFloat(),mousePos.y.toFloat(),30f,imgViolet))
     }.forEach {
         val cache = imgCache[it.imgData] ?: ImgCache().apply {
           imgCache[it.imgData] = this
@@ -477,14 +423,14 @@ void main(void) {
   inline fun MutableList<Float>.vert(vararg args:Float) = addAll(args.toList())//todo check why asList doesn't working
   inline fun WebGLTexture.render(mode:Mode,lambda:MutableList<Float>.()->Unit) = render(mode,arrayListOf<Float>().also {it.lambda()}.toFloatArray())
   inline fun render(mode:Mode,mesh:Float32Array,glTexture:WebGLTexture?,allFloatArgsCount:Int) {
-    debugError("allFloatArgsCount<=0") {allFloatArgsCount<=0}
-    debugError("Number of vertices not a multiple of the attribute block size!") {allFloatArgsCount%verticesBlockSize!=0}
+    lib.debug {
+      if(allFloatArgsCount<=0) lib.log.error("allFloatArgsCount<=0")
+      if(allFloatArgsCount%verticesBlockSize!=0) lib.log.error("Number of vertices not a multiple of the attribute block size!")
+    }
     gl.activeTexture(WGL.TEXTURE0)
     if(glTexture != null) if(DYNAMIC_TEXTURE) gl.bindTexture(WGL.TEXTURE_2D,glTexture)
-    if(OLD&&DYNAMIC_SHADER) gl.useProgram(shaderProgram)
     gl.bufferData(WGL.ARRAY_BUFFER,mesh,WGL.DYNAMIC_DRAW)//todo test STATIC_DRAW fps
     gl.drawArrays(mode.glMode,0,allFloatArgsCount/verticesBlockSize)//todo first, count
-    if(OLD&&DYNAMIC_SHADER) gl.useProgram(null)
   }
 }
 
@@ -493,9 +439,3 @@ enum class Mode(val glMode:Int) {
   TRIANGLE_FAN(WGL.TRIANGLE_FAN),
   TRIANGLE_STRIP(WGL.TRIANGLE_STRIP)
 }
-
-inline fun debugError(message:String,noinline condition:()->Boolean) {
-  if(DEBUG_ERROR&&condition()) JsUtil.error("WebGl error: $message, conditionFunction: $condition")
-}
-
-fun mem(v:String):String = "$v ${js("performance.memory")[v]/1024/1024}"
