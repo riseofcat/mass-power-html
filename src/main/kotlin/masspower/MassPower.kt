@@ -164,7 +164,7 @@ uniform sampler2D u_sampler;
 uniform lowp int u_test_array_size;
 uniform lowp vec4 u_vec_arr[gl_MaxVertexUniformVectors/2 - 5];
 void main(void) {
-  gl_FragColor = vec4(0.5,0.5,0.5,0.5);
+  gl_FragColor = vec4(0.2,0.2,0.2,0.5);
 }
 """,WGL.FRAGMENT_SHADER))
   val attributes = listOf(Attr("a_position",2),Attr("a_boundingBox",2),Attr("a_texCoord",2),Attr("a_scale",1),Attr("a_rotation",1),Attr("a_divide",1)).run {
@@ -352,14 +352,11 @@ void main(void) {
     if(true)state?.reactive?.forEach {
       it.pos.x
       val scl = 0.1f
-      renderCircle16(it.pos.x.toFloat(),it.pos.y.toFloat(),0f,0f,0.5f,0.5f,scl,0f,0f) {a->
+      renderCircle8(it.pos.x.toFloat(),it.pos.y.toFloat(),0f,0f,0.5f,0.5f,scl,0f,0f) {a->
         val cos = kotlin.math.cos(a)
         val sin = kotlin.math.sin(a)
-        val DIVIDE = 1.65f
-        val glowRadius = 0.75f
         val size=it.radius*10
-        CircleFanStrip(floatArrayOf(it.pos.x.toFloat(),it.pos.y.toFloat(),cos*size/2,sin*size/2,cos*0.5f+0.5f,sin*0.5f+0.5f,size,0f,1f),
-          floatArrayOf(it.pos.x.toFloat(),it.pos.y.toFloat(),cos*size*glowRadius,sin*size*glowRadius,0.5f+cos*0.5f,0.5f+sin*0.5f,scl,0f,DIVIDE))
+        floatArrayOf(it.pos.x.toFloat(),it.pos.y.toFloat(),cos*size/2,sin*size/2,cos*0.5f+0.5f,sin*0.5f+0.5f,size,0f,1f)
       }
     }
     mutableListOf<RenderData>(/*RenderData(500f,500f,someWdthInGameCoords,imgGreen)*/).apply {
@@ -432,26 +429,18 @@ void main(void) {
   inline fun angle(i:Int,max:Int):Float = 2*kotlin.math.PI.toFloat()*i/max
   data class CircleFanStrip(val fan:FloatArray,val strip:FloatArray)
 
-  inline fun renderCircle16(vararg center:Float,fan:(angle:Float)->CircleFanStrip) {
-    val max = 4
-    val (f0,s0) = fan(angle(0,max))//todo расчёт до исполнения через companion object
-    val (f1,s1) = fan(angle(1,max))
-    val (f2,s2) = fan(angle(2,max))
-    val (f3,s3) = fan(angle(3,max))
-//    val (f4,s4) = fan(angle(4,max))
-//    val (f5,s5) = fan(angle(5,max))
-//    val (f6,s6) = fan(angle(6,max))
-//    val (f7,s7) = fan(angle(7,max))
-//    val (f8,s8) = fan(angle(8,max))
-//    val (f9,s9) = fan(angle(9,max))
-//    val (f10,s10) = fan(angle(10,max))
-//    val (f11,s11) = fan(angle(11,max))
-//    val (f12,s12) = fan(angle(12,max))
-//    val (f13,s13) = fan(angle(13,max))
-//    val (f14,s14) = fan(angle(14,max))
-//    val (f15,s15) = fan(angle(15,max))
+  inline fun renderCircle8(vararg center:Float,fan:(angle:Float)->FloatArray) {
+    val max = 8
+    val f0 = fan(angle(0,max))
+    val f1 = fan(angle(1,max))
+    val f2 = fan(angle(2,max))
+    val f3 = fan(angle(3,max))
+    val f4 = fan(angle(4,max))
+    val f5 = fan(angle(5,max))
+    val f6 = fan(angle(6,max))
+    val f7 = fan(angle(7,max))
     if(DYNAMIC_BLEND) gl.blendFunc(srcFactor,dstFactor)
-    render(Mode.TRIANGLE_FAN,*center,*f0,*f1,*f2,*f3,/**f4,*f5,*f6,*f7,*f8,*f9,*f10,*f11,*f12,*f13,*f14,*f15,*/*f0)
+    render(Mode.TRIANGLE_FAN,*center,*f0,*f1,*f2,*f3,*f4,*f5,*f6,*f7,*f0)
   }
   inline fun render(mode:Mode,vararg allArgs:Float) = render(mode,allArgs)
   inline fun render(mode:Mode,allArgs:FloatArray) = render(mode,if(true) allArgs as Float32Array else Float32Array(allArgs.toTypedArray()),null,allArgs.size)
