@@ -17,6 +17,7 @@ const val DYNAMIC_SHADER = true//default true +1 fps
 const val DYNAMIC_TEXTURE = true//default true +2 fps
 const val DEBUG_ERROR = false//default true +2 fps
 const val BIG_TEXTURE = false//default true +20 fps
+const val BLEND = true//не влияет на производительность
 const val DYNAMIC_BLEND = true//не влияет на производительность
 const val SCALE_SMALL = 0.1f
 const val IMG_SIZE_PX = 128//todo Важно для scale картинки
@@ -225,7 +226,7 @@ void main(void) {
       }
 
       gl.enable(WGL.BLEND)
-      if(!DYNAMIC_BLEND) gl.blendFunc(srcFactor,dstFactor)
+      if(BLEND && !DYNAMIC_BLEND) gl.blendFunc(srcFactor,dstFactor)
       gameLoop(it)
     }
     document.onmousemove = fun(event:Event) {
@@ -352,11 +353,12 @@ void main(void) {
     if(true)state?.reactive?.forEach {
       it.pos.x
       val scl = 0.1f
+      //поехал центр, было: it.x,it.y,0f,0f,0.5f,0.5f,it.scale,0f,0f
       renderCircle8(it.pos.x.toFloat(),it.pos.y.toFloat(),0f,0f,0.5f,0.5f,scl,0f,0f) {a->
         val cos = kotlin.math.cos(a)
         val sin = kotlin.math.sin(a)
         val size=it.radius*10
-        floatArrayOf(it.pos.x.toFloat(),it.pos.y.toFloat(),cos*size/2,sin*size/2,cos*0.5f+0.5f,sin*0.5f+0.5f,size,0f,1f)
+        floatArrayOf(it.pos.x.toFloat(),it.pos.y.toFloat(),cos*size/2,sin*size/2,cos*0.5f+0.5f,sin*0.5f+0.5f,scl,0f,1f)
       }
     }
     mutableListOf<RenderData>(/*RenderData(500f,500f,someWdthInGameCoords,imgGreen)*/).apply {
@@ -439,7 +441,7 @@ void main(void) {
     val f5 = fan(angle(5,max))
     val f6 = fan(angle(6,max))
     val f7 = fan(angle(7,max))
-    if(DYNAMIC_BLEND) gl.blendFunc(srcFactor,dstFactor)
+    if(BLEND && DYNAMIC_BLEND) gl.blendFunc(srcFactor,dstFactor)
     render(Mode.TRIANGLE_FAN,*center,*f0,*f1,*f2,*f3,*f4,*f5,*f6,*f7,*f0)
   }
   inline fun render(mode:Mode,vararg allArgs:Float) = render(mode,allArgs)
@@ -463,10 +465,10 @@ void main(void) {
     val (f13,s13) = fan(angle(13,max))
     val (f14,s14) = fan(angle(14,max))
     val (f15,s15) = fan(angle(15,max))
-    if(DYNAMIC_BLEND) gl.blendFunc(srcFactor,dstFactor)
+    if(BLEND && DYNAMIC_BLEND) gl.blendFunc(srcFactor,dstFactor)
     if(DYNAMIC_SHADER) gl.useProgram(shaderProgram)
     render(Mode.TRIANGLE_FAN,*center,*f0,*f1,*f2,*f3,*f4,*f5,*f6,*f7,*f8,*f9,*f10,*f11,*f12,*f13,*f14,*f15,*f0)
-    if(DYNAMIC_BLEND) gl.blendFunc(srcFactorGlow,dstFactorGlow)
+    if(BLEND && DYNAMIC_BLEND) gl.blendFunc(srcFactorGlow,dstFactorGlow)
     render(Mode.TRIANGLE_STRIP,*f0,*s0,*f1,*s1,*f2,*s2,*f3,*s3,*f4,*s4,*f5,*s5,*f6,*s6,*f7,*s7,*f8,*s8,*f9,*s9,*f10,*s10,*f11,*s11,*f12,*s12,*f13,*s13,*f14,*s14,*f15,*s15,*f0,*s0)
   }
 
