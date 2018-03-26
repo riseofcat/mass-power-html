@@ -285,7 +285,7 @@ void main(void) {
     html.canvas2d.fillText("fps: $fps",200.0,500.0)
     html.canvas2d.fillText(Gen.date(),200.0,550.0)
     html.canvas2d.fillText(ServerCommon.test(),200.0,600.0)
-    gl.clearColor(0f,0f,0f,1f)//todo потестировать прозрачность fps
+    gl.clearColor(0f,0f,0f,1f)
     gl.clear(WGL.COLOR_BUFFER_BIT)
     val imgRed = ImgData("img/smiley_small_rect_red.png")
     val imgGreen = ImgData("img/smiley_small_rect_green.png")
@@ -300,9 +300,7 @@ void main(void) {
       it.pos.x
       val scl = 0.1f
       //поехал центр, было: it.x,it.y,0f,0f,0.5f,0.5f,it.scale,0f,0f
-      renderCircle8(it.pos.x.toFloat(),it.pos.y.toFloat(),0f,0f,0.5f,0.5f,scl,0f,0f) {a->
-        val cos = kotlin.math.cos(a)
-        val sin = kotlin.math.sin(a)
+      renderCircle8(it.pos.x.toFloat(),it.pos.y.toFloat(),0f,0f,0.5f,0.5f,scl,0f,0f) {cos, sin->
         val size=it.radius*10
         floatArrayOf(it.pos.x.toFloat(),it.pos.y.toFloat(),cos*size/2,sin*size/2,cos*0.5f+0.5f,sin*0.5f+0.5f,scl,0f,1f)
       }
@@ -365,16 +363,17 @@ void main(void) {
   inline fun angle(i:Int,max:Int):Float = 2*kotlin.math.PI.toFloat()*i/max
   data class CircleFanStrip(val fan:FloatArray,val strip:FloatArray)
 
-  inline fun renderCircle8(vararg center:Float,fan:(angle:Float)->FloatArray) {
+  inline fun renderCircle8(vararg center:Float,fan:(cos:Float, sin:Float)->FloatArray) {//todo test no inline performance
     val max = 8
-    val f0 = fan(angle(0,max))
-    val f1 = fan(angle(1,max))
-    val f2 = fan(angle(2,max))
-    val f3 = fan(angle(3,max))
-    val f4 = fan(angle(4,max))
-    val f5 = fan(angle(5,max))
-    val f6 = fan(angle(6,max))
-    val f7 = fan(angle(7,max))
+    //todo test performance with precalculate constants
+    val f0 = angle(0,max).let {fan(kotlin.math.cos(it), kotlin.math.sin(it))}
+    val f1 = angle(1,max).let {fan(kotlin.math.cos(it), kotlin.math.sin(it))}
+    val f2 = angle(2,max).let {fan(kotlin.math.cos(it), kotlin.math.sin(it))}
+    val f3 = angle(3,max).let {fan(kotlin.math.cos(it), kotlin.math.sin(it))}
+    val f4 = angle(4,max).let {fan(kotlin.math.cos(it), kotlin.math.sin(it))}
+    val f5 = angle(5,max).let {fan(kotlin.math.cos(it), kotlin.math.sin(it))}
+    val f6 = angle(6,max).let {fan(kotlin.math.cos(it), kotlin.math.sin(it))}
+    val f7 = angle(7,max).let {fan(kotlin.math.cos(it), kotlin.math.sin(it))}
     if(BLEND && DYNAMIC_BLEND) gl.blendFunc(srcFactor,dstFactor)
     render(Mode.TRIANGLE_FAN,*center,*f0,*f1,*f2,*f3,*f4,*f5,*f6,*f7,*f0)
   }
@@ -382,8 +381,9 @@ void main(void) {
   inline fun render(mode:Mode,allArgs:FloatArray) = render(mode,if(true) allArgs as Float32Array else Float32Array(allArgs.toTypedArray()),null,allArgs.size)
 
   inline fun WebGLTexture.renderCircle16(vararg center:Float,fan:(angle:Float)->CircleFanStrip) {
+    //todo расчёт до исполнения angle. И можно заменить на cos, sin. Проверить производительность
     val max = 16
-    val (f0,s0) = fan(angle(0,max))//todo расчёт до исполнения через companion object
+    val (f0,s0) = fan(angle(0,max))
     val (f1,s1) = fan(angle(1,max))
     val (f2,s2) = fan(angle(2,max))
     val (f3,s3) = fan(angle(3,max))

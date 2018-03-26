@@ -87,5 +87,7 @@ actual class Common {
       req.send(null)
       return req.responseText
     }
+
+    fun Any.callApply(functionName:String,vararg args:Any?):Any? = asDynamic()[functionName]?.apply(this,args)//this.asDynamic().call
   }
 }
