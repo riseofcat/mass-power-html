@@ -17,7 +17,6 @@ const val DYNAMIC_SHADER = true//default true +1 fps
 const val DYNAMIC_TEXTURE = true//default true +2 fps
 const val BLEND = true//не влияет на производительность
 const val DYNAMIC_BLEND = true//не влияет на производительность
-const val SCALE_SMALL = 0.1f
 const val IMG_SIZE_PX = 128//Важно для scale картинки
 
 class TextureData(val vMatrix:Matrix4)
@@ -275,6 +274,15 @@ void main(void) {
   var srcFactor = WGL.SRC_ALPHA
   var dstFactor = WGL.ONE_MINUS_SRC_ALPHA
 
+  val imgRed = ImgData("img/smiley_small_rect_red.png")
+  val imgGreen = ImgData("img/smiley_small_rect_green.png")
+  val imgBlue = ImgData("img/smiley_small_rect_blue.png")
+  val imgYellow = ImgData("img/smiley_small_rect_yellow.png")
+  val imgViolet = ImgData("img/smiley_small_rect_violet.png")
+  val imgGray = ImgData("img/smiley_small_rect_gray.png")
+  val colors = listOf(imgRed,imgGreen,imgBlue,imgYellow,imgViolet)
+  val PlayerId.color get() = colors.let {it[id%it.size]}
+
   private fun gameLoop(милисекундСоСтараПлюсБездействие:Double):Unit = lib.saveInvoke {
     fps = (fps*averageConst+1f/(time-previousTime)).toFloat()/(averageConst+1)
     previousTime = time
@@ -287,12 +295,6 @@ void main(void) {
     html.canvas2d.fillText(ServerCommon.test(),200.0,600.0)
     gl.clearColor(0f,0f,0f,1f)
     gl.clear(WGL.COLOR_BUFFER_BIT)
-    val imgRed = ImgData("img/smiley_small_rect_red.png")
-    val imgGreen = ImgData("img/smiley_small_rect_green.png")
-    val imgBlue = ImgData("img/smiley_small_rect_blue.png")
-    val imgYellow = ImgData("img/smiley_small_rect_yellow.png")
-    val imgViolet = ImgData("img/smiley_small_rect_violet.png")
-    val imgGray = ImgData("img/smiley_small_rect_gray.png")
 
     val state = model?.calcDisplayState()
     if(DYNAMIC_SHADER) gl.useProgram(shaderProgram3)
@@ -308,12 +310,8 @@ void main(void) {
     mutableListOf<RenderData>(/*RenderData(500f,500f,someWdthInGameCoords,imgGreen)*/).apply {
       if(state != null) {
         state.foods.forEach {add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),it.radius*2,imgGray))}
-        fun PlayerId.color():ImgData {
-          val list = listOf(imgRed,imgGreen,imgBlue,imgYellow,imgViolet)
-          return list[id%list.size]
-        }
-        if(false) state.reactive.forEach {add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),it.radius*2,it.owner.color()))}
-        state.cars.forEach {add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),it.radius*2,it.owner.color()))}
+        if(false) state.reactive.forEach {add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),it.radius*2,it.owner.color))}
+        state.cars.forEach {add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),it.radius*2,it.owner.color))}
       }
       add(RenderData(mousePos.x.toFloat(),mousePos.y.toFloat(),30f,imgViolet))
     }.forEach {
@@ -336,9 +334,7 @@ void main(void) {
           img.src = it.imgData.url
         }
         cache.texture?.apply {
-          glTexture.renderCircle16(it.x,it.y,0f,0f,0.5f,0.5f,it.scale,0f,0f) {a->
-            val cos = kotlin.math.cos(a)
-            val sin = kotlin.math.sin(a)
+          glTexture.renderCircle16(it.x,it.y,0f,0f,0.5f,0.5f,it.scale,0f,0f) {cos,sin->
             val DIVIDE = 1.65f
             val glowRadius = 0.75f
             CircleFanStrip(floatArrayOf(it.x,it.y,cos*width/2,sin*height/2,cos*0.5f+0.5f,sin*0.5f+0.5f,it.scale,0f,1f),
@@ -364,9 +360,12 @@ void main(void) {
   val radian8 = (1..8).toList().map {angle(it,8)}
   val cos8 = radian8.map {kotlin.math.cos(it)}.toFloatArray()
   val sin8 = radian8.map {kotlin.math.sin(it)}.toFloatArray()
+  val radian16 = (1..16).toList().map {angle(it,16)}
+  val cos16 = radian16.map {kotlin.math.cos(it)}.toFloatArray()
+  val sin16 = radian16.map {kotlin.math.sin(it)}.toFloatArray()
   data class CircleFanStrip(val fan:FloatArray,val strip:FloatArray)
 
-  fun renderCircle8(vararg center:Float,fan:(cos:Float, sin:Float)->FloatArray) {
+  fun renderCircle8(vararg center:Float,fan:(cos:Float, sin:Float)->FloatArray) {//noinline better performance
     val f0 = fan(cos8[0], sin8[0])
     val f1 = fan(cos8[1], sin8[1])
     val f2 = fan(cos8[2], sin8[2])
@@ -381,25 +380,23 @@ void main(void) {
   inline fun render(mode:Mode,vararg allArgs:Float) = render(mode,allArgs)
   inline fun render(mode:Mode,allArgs:FloatArray) = render(mode,if(true) allArgs as Float32Array else Float32Array(allArgs.toTypedArray()),null,allArgs.size)
 
-  inline fun WebGLTexture.renderCircle16(vararg center:Float,fan:(angle:Float)->CircleFanStrip) {
-    //todo расчёт до исполнения angle. И можно заменить на cos, sin. Проверить производительность
-    val max = 16
-    val (f0,s0) = fan(angle(0,max))
-    val (f1,s1) = fan(angle(1,max))
-    val (f2,s2) = fan(angle(2,max))
-    val (f3,s3) = fan(angle(3,max))
-    val (f4,s4) = fan(angle(4,max))
-    val (f5,s5) = fan(angle(5,max))
-    val (f6,s6) = fan(angle(6,max))
-    val (f7,s7) = fan(angle(7,max))
-    val (f8,s8) = fan(angle(8,max))
-    val (f9,s9) = fan(angle(9,max))
-    val (f10,s10) = fan(angle(10,max))
-    val (f11,s11) = fan(angle(11,max))
-    val (f12,s12) = fan(angle(12,max))
-    val (f13,s13) = fan(angle(13,max))
-    val (f14,s14) = fan(angle(14,max))
-    val (f15,s15) = fan(angle(15,max))
+  fun WebGLTexture.renderCircle16(vararg center:Float,fan:(cos:Float, sin:Float)->CircleFanStrip) {//noinline better performance
+    val (f0,s0) = fan(cos16[0], sin16[0])
+    val (f1,s1) = fan(cos16[1], sin16[1])
+    val (f2,s2) = fan(cos16[2], sin16[2])
+    val (f3,s3) = fan(cos16[3], sin16[3])
+    val (f4,s4) = fan(cos16[4], sin16[4])
+    val (f5,s5) = fan(cos16[5], sin16[5])
+    val (f6,s6) = fan(cos16[6], sin16[6])
+    val (f7,s7) = fan(cos16[7], sin16[7])
+    val (f8,s8) = fan(cos16[8], sin16[8])
+    val (f9,s9) = fan(cos16[9], sin16[9])
+    val (f10,s10) = fan(cos16[10], sin16[10])
+    val (f11,s11) = fan(cos16[11], sin16[11])
+    val (f12,s12) = fan(cos16[12], sin16[12])
+    val (f13,s13) = fan(cos16[13], sin16[13])
+    val (f14,s14) = fan(cos16[14], sin16[14])
+    val (f15,s15) = fan(cos16[15], sin16[15])
     if(BLEND && DYNAMIC_BLEND) gl.blendFunc(srcFactor,dstFactor)
     if(DYNAMIC_SHADER) gl.useProgram(shaderProgram)
     render(Mode.TRIANGLE_FAN,*center,*f0,*f1,*f2,*f3,*f4,*f5,*f6,*f7,*f8,*f9,*f10,*f11,*f12,*f13,*f14,*f15,*f0)
