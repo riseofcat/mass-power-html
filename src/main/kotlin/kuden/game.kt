@@ -94,7 +94,7 @@ abstract class Game(sizeType:SizeType,val clearColor:RGBA? = null):InputProcesso
     html.canvas2d.canvas.setAttribute("style","position: absolute; left: ${view.borderLeft}px; top: ${view.borderTop}px; z-index: 10; width: ${view.windowWidth}px; height: ${view.windowHeight}px;")//todo change?
   }
 
-  private fun gameLoop(наверноеDeltaTime:Double):Unit = JsUtil.saveInvoke {
+  private fun gameLoop(наверноеDeltaTime:Double):Unit = lib.saveInvoke {
     if(false) resize()
     if(!pause) {
       html.canvas2d.clearRect(0.0,0.0,view.gameWidth.toDouble(),view.gameHeight.toDouble())

@@ -4,22 +4,6 @@ import org.w3c.dom.*
 import org.w3c.dom.events.*
 import kotlin.reflect.*
 
-object JsUtil {
-
-  inline fun saveInvoke(lambda:()->Unit) {
-    return saveInvoke<Unit>(lambda)?:Unit
-  }
-
-  inline fun <T> saveInvoke(lambda:()->T):T? {
-    try {
-      return lambda()
-    } catch(e:Exception) {
-      console.log(e.message,e)
-      return null
-    }
-  }
-}
-
 fun Any.callApply(functionName:String,vararg args:Any?):Any? = asDynamic()[functionName]?.apply(this,args)//this.asDynamic().call
 fun MouseEvent.getX(element:Element) = pageX-element.getBoundingClientRect().left
 fun MouseEvent.getY(element:Element) = pageY-element.getBoundingClientRect().top

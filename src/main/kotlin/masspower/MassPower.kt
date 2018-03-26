@@ -275,7 +275,7 @@ void main(void) {
   var srcFactor = WGL.SRC_ALPHA
   var dstFactor = WGL.ONE_MINUS_SRC_ALPHA
 
-  private fun gameLoop(милисекундСоСтараПлюсБездействие:Double):Unit = JsUtil.saveInvoke {
+  private fun gameLoop(милисекундСоСтараПлюсБездействие:Double):Unit = lib.saveInvoke {
     fps = (fps*averageConst+1f/(time-previousTime)).toFloat()/(averageConst+1)
     previousTime = time
     if(false) resize()
