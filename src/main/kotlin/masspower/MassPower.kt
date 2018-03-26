@@ -360,20 +360,21 @@ void main(void) {
     window.requestAnimationFrame(::gameLoop)
   }
 
-  inline fun angle(i:Int,max:Int):Float = 2*kotlin.math.PI.toFloat()*i/max
+  fun angle(i:Int,max:Int) = 2*kotlin.math.PI.toFloat()*i/max
+  val radian8 = (1..8).toList().map {angle(it,8)}
+  val cos8 = radian8.map {kotlin.math.cos(it)}.toFloatArray()
+  val sin8 = radian8.map {kotlin.math.sin(it)}.toFloatArray()
   data class CircleFanStrip(val fan:FloatArray,val strip:FloatArray)
 
-  inline fun renderCircle8(vararg center:Float,fan:(cos:Float, sin:Float)->FloatArray) {//todo test no inline performance
-    val max = 8
-    //todo test performance with precalculate constants
-    val f0 = angle(0,max).let {fan(kotlin.math.cos(it), kotlin.math.sin(it))}
-    val f1 = angle(1,max).let {fan(kotlin.math.cos(it), kotlin.math.sin(it))}
-    val f2 = angle(2,max).let {fan(kotlin.math.cos(it), kotlin.math.sin(it))}
-    val f3 = angle(3,max).let {fan(kotlin.math.cos(it), kotlin.math.sin(it))}
-    val f4 = angle(4,max).let {fan(kotlin.math.cos(it), kotlin.math.sin(it))}
-    val f5 = angle(5,max).let {fan(kotlin.math.cos(it), kotlin.math.sin(it))}
-    val f6 = angle(6,max).let {fan(kotlin.math.cos(it), kotlin.math.sin(it))}
-    val f7 = angle(7,max).let {fan(kotlin.math.cos(it), kotlin.math.sin(it))}
+  fun renderCircle8(vararg center:Float,fan:(cos:Float, sin:Float)->FloatArray) {
+    val f0 = fan(cos8[0], sin8[0])
+    val f1 = fan(cos8[1], sin8[1])
+    val f2 = fan(cos8[2], sin8[2])
+    val f3 = fan(cos8[3], sin8[3])
+    val f4 = fan(cos8[4], sin8[4])
+    val f5 = fan(cos8[5], sin8[5])
+    val f6 = fan(cos8[6], sin8[6])
+    val f7 = fan(cos8[7], sin8[7])
     if(BLEND && DYNAMIC_BLEND) gl.blendFunc(srcFactor,dstFactor)
     render(Mode.TRIANGLE_FAN,*center,*f0,*f1,*f2,*f3,*f4,*f5,*f6,*f7,*f0)
   }
