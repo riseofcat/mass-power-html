@@ -1,5 +1,6 @@
 package domain.fractal
 
+import com.riseofcat.lib.*
 import kuden.*
 import org.khronos.webgl.*
 import util.*
@@ -57,7 +58,7 @@ class Fractal1Data(var x:Double = 0.0,var y:Double = 0.0,var offsetX:Double = 0.
 class Fractal1(val html:HTMLElements) {
   val start = Date().getTime()
   val webgl = html.webgl
-  val attribBuffer = webgl.createBuffer() ?: JsUtil.error("Unable to create webgl buffer!")
+  val attribBuffer = webgl.createBuffer() ?: lib.log.fatalError("Unable to create webgl buffer!")
   val shaderProgram:ShaderProgram<Fractal1Data> = ShaderProgram(webgl,DType.TRIANGLE,vertexShader,fragmentShader,
     arrayOf(VertextAttributeInfo("a_position",2))) {
     it.program.setUniform2f("u_julia",it.data.x,it.data.y)

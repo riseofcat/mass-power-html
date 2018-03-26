@@ -1,18 +1,10 @@
 package util
 
-import kuden.*
 import org.w3c.dom.*
 import org.w3c.dom.events.*
-import org.w3c.xhr.*
 import kotlin.reflect.*
 
 object JsUtil {
-  fun urlGet(url:String):String {
-    val req = XMLHttpRequest()
-    req.open("GET",url,false)
-    req.send(null)
-    return req.responseText
-  }
 
   inline fun saveInvoke(lambda:()->Unit) {
     return saveInvoke<Unit>(lambda)?:Unit
@@ -24,19 +16,6 @@ object JsUtil {
     } catch(e:Exception) {
       console.log(e.message,e)
       return null
-    }
-  }
-
-  fun error(vararg args:Any?):Nothing {
-    val errStr = "error: "+args.map {it.toString()}.joinToString(", ")
-    HTMLElements().container.innerText = errStr
-    args.forEach {
-      console.log(it)
-    }
-    if(args.size>0) {
-      kotlin.error(args[0] ?: "Unknown error")
-    } else {
-      kotlin.error("Unknown error")
     }
   }
 }

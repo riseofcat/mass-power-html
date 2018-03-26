@@ -1,5 +1,6 @@
 package kuden
 
+import com.riseofcat.lib.*
 import org.khronos.webgl.*
 import util.*
 
@@ -18,15 +19,15 @@ class ShaderPog<TVarying, TAttributes, TUniform>(vertex:VertexShader<out TVaryin
 fun WebGLRenderingContext.compileShader(source:String,type:Int):WebGLShader = createShader(type)?.also {
   shaderSource(it,source)
   compileShader(it)
-  if(getShaderParameter(it,WebGLRenderingContext.COMPILE_STATUS)==false) JsUtil.error("Unable to compile shader!",source,getShaderInfoLog(it))
-} ?: JsUtil.error("Unable to request shader from webgl context!")
+  if(getShaderParameter(it,WebGLRenderingContext.COMPILE_STATUS)==false) lib.log.fatalError("Unable to compile shader! $source ${getShaderInfoLog(it)}")
+} ?: lib.log.fatalError("Unable to request shader from webgl context!")
 fun WebGLRenderingContext.createWebGLProgram(vertexSrc:String,fragmentSrc:String) = createWebGLProgram(compileShader(vertexSrc,WebGLRenderingContext.VERTEX_SHADER), compileShader(fragmentSrc,WebGLRenderingContext.FRAGMENT_SHADER))
 fun WebGLRenderingContext.createWebGLProgram(vertex:WebGLShader,fragment:WebGLShader) = createProgram()?.also {
   attachShader(it,vertex)
   attachShader(it,fragment)
   linkProgram(it)
-  if(getProgramParameter(it,WebGLRenderingContext.LINK_STATUS)==false) JsUtil.error("Unable to compile shader program!",getProgramInfoLog(it))
-} ?: JsUtil.error("Unable to request shader program from webgl context!")
+  if(getProgramParameter(it,WebGLRenderingContext.LINK_STATUS)==false) lib.log.fatalError("Unable to compile shader program! ${getProgramInfoLog(it)}")
+} ?: lib.log.fatalError("Unable to request shader program from webgl context!")
 
 enum class DType(val glDrawType:Int) {
   TRIANGLE(WebGLRenderingContext.Companion.TRIANGLES)
@@ -92,7 +93,7 @@ class ShaderProgram<T>(val webgl:WebGLRenderingContext,val drawType:DType,vertxS
   data class SetData<T>(val program:ShaderProgram<T>,val data:T)
   inner class ShaderProgramMesh {
     val verticesBuffer:Float32Array = Float32Array(20_000-(20_000%drawLength))
-    val attribBuffer:WebGLBuffer = webgl.createBuffer() ?: JsUtil.error("Unable to create webgl buffer!")
+    val attribBuffer:WebGLBuffer = webgl.createBuffer() ?: lib.log.fatalError("Unable to create webgl buffer!")
     var currentIndex:Int = 0
     fun queue(vararg vertices:Float) = queueArray(vertices.toTypedArray())
     fun remaining() = verticesBuffer.length-currentIndex
@@ -108,7 +109,7 @@ class ShaderProgram<T>(val webgl:WebGLRenderingContext,val drawType:DType,vertxS
 
     fun render(userdata:T) {
       if(currentIndex>0) {
-        if(currentIndex%verticesBlockSize!=0) JsUtil.error("Number of vertices not a multiple of the attribute block size!")
+        if(currentIndex%verticesBlockSize!=0) lib.log.fatalError("Number of vertices not a multiple of the attribute block size!")
         begin(attribBuffer,userdata)
         webgl.bufferData(WebGLRenderingContext.ARRAY_BUFFER,verticesBuffer,WebGLRenderingContext.DYNAMIC_DRAW)
         webgl.drawArrays(drawType.glDrawType,0,currentIndex/verticesBlockSize)

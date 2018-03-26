@@ -188,7 +188,7 @@ void main(void) {
     window.onresize = {resize()}
     window.onload = {resize()}
     window.requestAnimationFrame {
-      gl.bindBuffer(WGL.ARRAY_BUFFER,gl.createBuffer() ?: JsUtil.error("Unable to create webgl buffer!"))
+      gl.bindBuffer(WGL.ARRAY_BUFFER,gl.createBuffer() ?: lib.log.fatalError("Unable to create webgl buffer!"))
 
       gl.useProgram(shaderProgram)
       attributes.forEach {
@@ -309,19 +309,13 @@ void main(void) {
     }
     mutableListOf<RenderData>(/*RenderData(500f,500f,someWdthInGameCoords,imgGreen)*/).apply {
       if(state != null) {
-        state.foods.forEach {
-          add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),it.radius*2,imgGray))
-        }
+        state.foods.forEach {add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),it.radius*2,imgGray))}
         fun PlayerId.color():ImgData {
           val list = listOf(imgRed,imgGreen,imgBlue,imgYellow,imgViolet)
           return list[id%list.size]
         }
-        if(false) state.reactive.forEach {
-          add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),it.radius*2,it.owner.color()))
-        }
-        state.cars.forEach {
-          add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),it.radius*2,it.owner.color()))
-        }
+        if(false) state.reactive.forEach {add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),it.radius*2,it.owner.color()))}
+        state.cars.forEach {add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),it.radius*2,it.owner.color()))}
       }
       add(RenderData(mousePos.x.toFloat(),mousePos.y.toFloat(),30f,imgViolet))
     }.forEach {
@@ -329,7 +323,7 @@ void main(void) {
           imgCache[it.imgData] = this
           val img = document.createElement("img",HTMLImageElement::class)
           img.onload = {
-            val texture = gl.createTexture() ?: JsUtil.error("Couldn't create webgl texture!")
+            val texture = gl.createTexture() ?: lib.log.fatalError("Couldn't create webgl texture!")
             gl.bindTexture(WGL.TEXTURE_2D,texture)
             gl.pixelStorei(WGL.UNPACK_FLIP_Y_WEBGL,1) // second argument must be an int
             gl.texImage2D(WGL.TEXTURE_2D,0,WGL.RGBA,WGL.RGBA,WGL.UNSIGNED_BYTE,img)
@@ -353,24 +347,18 @@ void main(void) {
               floatArrayOf(it.x,it.y,cos*width*glowRadius,sin*height*glowRadius,0.5f+cos*0.5f,0.5f+sin*0.5f,it.scale,0f,DIVIDE))
           }
         }
-        if(false) cache.texture?.apply {
+        if(true) cache.texture?.apply {
           //Рисует прямоугольники
           glTexture.render(Mode.TRIANGLE,
-            it.x,it.y,left,bottom,0f,0f,it.scale,0f,it.x,it.y,left,top,0f,1f,it.scale,0f,it.x,it.y,right,top,1f,1f,it.scale,0f,
-            it.x,it.y,right,top,1f,1f,it.scale,0f,it.x,it.y,right,bottom,1f,0f,it.scale,0f,it.x,it.y,left,bottom,0f,0f,it.scale,0f)
+            it.x,it.y,left,bottom,0f,0f,it.scale,0f, 1f,
+            it.x,it.y,left,top,0f,1f,it.scale,0f, 1f,
+            it.x,it.y,right,top,1f,1f,it.scale,0f, 1f,
+
+            it.x,it.y,right,top,1f,1f,it.scale,0f, 1f,
+            it.x,it.y,right,bottom,1f,0f,it.scale,0f,1f,
+            it.x,it.y,left,bottom,0f,0f,it.scale,0f, 1f)
         }
       }
-    if(false) imgCache[imgGreen]?.texture?.glTexture?.render(Mode.TRIANGLE,123.45f)//todo сделать рендер треугольника через другой shader
-    if(false) {//Раньше было так
-      val MAX_MESH = 2000//default 20_000  Не зависит от количества рисуемых объектов
-      val mesh = Float32Array(MAX_MESH-(MAX_MESH%(verticesBlockSize*3)))//mesh находился внутри GameTexture. 3 - для треугольника, а у нас может быть FAN
-      inline fun render(mode:Mode,txtr:GameTexture,floatArgsCount:Int) = render(mode,mesh,txtr.glTexture,floatArgsCount)
-      val argsInVertixCount = 8//коливество аргументов в одной вершине
-      val verticesCount = 6//для прямоугольника из двух треугольников
-      val objectsCount = 100//количество объектов для рисования
-      val floatArgscount:Int = objectsCount*verticesCount*argsInVertixCount//количество переменных типа Float
-      imgCache.values.mapNotNull {it.texture}.forEach {render(Mode.TRIANGLE,it,floatArgscount)}
-    }
     window.requestAnimationFrame(::gameLoop)
   }
 
@@ -427,9 +415,9 @@ void main(void) {
       if(allFloatArgsCount<=0) lib.log.error("allFloatArgsCount<=0")
       if(allFloatArgsCount%verticesBlockSize!=0) lib.log.error("Number of vertices not a multiple of the attribute block size!")
     }
-    gl.activeTexture(WGL.TEXTURE0)
+    if(true) gl.activeTexture(WGL.TEXTURE0)
     if(glTexture != null) if(DYNAMIC_TEXTURE) gl.bindTexture(WGL.TEXTURE_2D,glTexture)
-    gl.bufferData(WGL.ARRAY_BUFFER,mesh,WGL.DYNAMIC_DRAW)//todo test STATIC_DRAW fps
+    gl.bufferData(WGL.ARRAY_BUFFER,mesh,WGL.DYNAMIC_DRAW)
     gl.drawArrays(mode.glMode,0,allFloatArgsCount/verticesBlockSize)//todo first, count
   }
 }

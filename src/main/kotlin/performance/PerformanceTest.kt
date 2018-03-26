@@ -141,7 +141,7 @@ void main(void) {
     window.onresize = {resize()}
     window.onload = {resize()}
     window.requestAnimationFrame {
-      gl.bindBuffer(WGL.ARRAY_BUFFER,gl.createBuffer() ?: JsUtil.error("Unable to create webgl buffer!"))
+      gl.bindBuffer(WGL.ARRAY_BUFFER,gl.createBuffer() ?: lib.log.fatalError("Unable to create webgl buffer!"))
 
 
       gl.useProgram(shaderProgram)
@@ -183,7 +183,7 @@ void main(void) {
       }
     }
     document.onclick = fun(event:Event) {
-      if(false) JsUtil.error("document.onclick")
+      if(false) lib.log.fatalError("document.onclick")
     }
     document.onkeypress = fun(event:Event) {
       if(event is KeyboardEvent) {
@@ -294,7 +294,7 @@ void main(void) {
           imgCache[it.imgData] = this
           val img = document.createElement("img",HTMLImageElement::class)
           img.onload = {
-            val texture = gl.createTexture() ?: JsUtil.error("Couldn't create webgl texture!")
+            val texture = gl.createTexture() ?: lib.log.fatalError("Couldn't create webgl texture!")
             gl.bindTexture(WGL.TEXTURE_2D,texture)
             gl.pixelStorei(WGL.UNPACK_FLIP_Y_WEBGL,1) // second argument must be an int
             gl.texImage2D(WGL.TEXTURE_2D,0,WGL.RGBA,WGL.RGBA,WGL.UNSIGNED_BYTE,img)
@@ -391,7 +391,7 @@ enum class Mode(val glMode:Int) {
 }
 
 inline fun debugError(message:String,noinline condition:()->Boolean) {
-  if(DEBUG_ERROR&&condition()) JsUtil.error("WebGl error: $message, conditionFunction: $condition")
+  if(DEBUG_ERROR&&condition()) lib.log.fatalError("WebGl error: $message, conditionFunction: $condition")
 }
 
 fun mem(v:String):String = "$v ${js("performance.memory")[v]/1024/1024}"

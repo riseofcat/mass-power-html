@@ -3,6 +3,7 @@ package com.riseofcat.common
 import com.riseofcat.lib.*
 import org.w3c.dom.*
 import org.w3c.dom.events.*
+import org.w3c.xhr.*
 import kotlin.js.*
 
 actual class Common {
@@ -78,6 +79,13 @@ actual class Common {
 
     fun permormanceNowMs():Double {
       return js("performance.now()")//todo только в debug
+    }
+
+    actual fun urlGet(url:String):String {
+      val req = XMLHttpRequest()
+      req.open("GET",url,false)
+      req.send(null)
+      return req.responseText
     }
   }
 }

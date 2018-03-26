@@ -1,5 +1,6 @@
 package domain.fractal
 
+import com.riseofcat.lib.*
 import kuden.*
 import org.khronos.webgl.*
 import util.*
@@ -51,7 +52,7 @@ class Fractal2(val html:HTMLElements) {
     arrayOf(VertextAttributeInfo("a_position",2))) {
     it.program.setUniform4f("u_viewWindow",it.data.offsetX,it.data.offsetY,0f,0f)
   }
-  val attribBuffer = webgl.createBuffer() ?: JsUtil.error("Unable to create webgl buffer!")
+  val attribBuffer = webgl.createBuffer() ?: lib.log.fatalError("Unable to create webgl buffer!")
 
   fun render() {
     html.resize()

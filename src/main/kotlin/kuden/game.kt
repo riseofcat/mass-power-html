@@ -1,5 +1,6 @@
 package kuden
 
+import com.riseofcat.lib.*
 import org.khronos.webgl.*
 import org.w3c.dom.*
 import org.w3c.dom.events.*
@@ -20,7 +21,7 @@ class HTMLElements {
     container.appendChild(webGlCanvas)
     val webglcanvas = webGlCanvas.getContext("webgl") ?: webGlCanvas.getContext("experimental-webgl")
     if(webglcanvas!=null) webgl = webglcanvas as WebGLRenderingContext
-    else JsUtil.error("Your browser doesn't seem to support webgl!","webgl?",webglcanvas)
+    else lib.log.fatalError("Your browser doesn't seem to support webgl!$webglcanvas")
     canvas2d = document.createCanvas(
       "position: absolute; left: 0px; top: 0px; z-index: 10; width: 1000px; height: 500px;")
       .apply {container.appendChild(this)}//todo resize
@@ -215,11 +216,11 @@ abstract class Game(sizeType:SizeType,val clearColor:RGBA? = null):InputProcesso
 
     private fun load(filename:String,callback:(t:Texture)->Unit) =
       document.createElement("img",HTMLImageElement::class).let /*todo createElement("img") is Bad*/{img->
-          img.onload = {callback(temp1_1(gl.createTexture() ?: JsUtil.error("Couldn't create webgl texture!"),img))}
+          img.onload = {callback(temp1_1(gl.createTexture() ?: lib.log.fatalError("Couldn't create webgl texture!"),img))}
           img.src = filename
         }
 
-    fun create(image:HTMLImageElement) = temp1_1(gl.createTexture() ?: JsUtil.error("Couldn't create webgl texture!"),image)
+    fun create(image:HTMLImageElement) = temp1_1(gl.createTexture() ?: lib.log.fatalError("Couldn't create webgl texture!"),image)
 
     private fun temp0(texture:WebGLTexture) {
       gl.bindTexture(WebGLRenderingContext.TEXTURE_2D,texture)
@@ -248,7 +249,7 @@ abstract class Game(sizeType:SizeType,val clearColor:RGBA? = null):InputProcesso
       return Texture(webGlTexture,shaderProgram,width,height).apply {textures.add(this)}
     }
 
-    private fun create(width:Int,height:Int,imageBuf:ArrayBufferView) = temp1_2(gl.createTexture() ?: JsUtil.error("Couldn't create webgl texture!"),width,height,imageBuf)
+    private fun create(width:Int,height:Int,imageBuf:ArrayBufferView) = temp1_2(gl.createTexture() ?: lib.log.fatalError("Couldn't create webgl texture!"),width,height,imageBuf)
     operator fun get(imgTex:ImgTexData,f:(t:Texture)->Unit) = load(imgTex.url,f)
     operator fun <T> get(genTex:GenTexData<T>):Texture = create(genTex.width,genTex.height,genTex.f(genTex.t))
     fun render() = textures.forEach {it.render()}
@@ -313,7 +314,7 @@ abstract class Game(sizeType:SizeType,val clearColor:RGBA? = null):InputProcesso
     private val keys:MutableMap<Int,Double> = HashMap()
 
     init {
-      val body = document.body ?: JsUtil.error("Can't register key events, document.body is null!?")
+      val body = document.body ?: lib.log.fatalError("Can't register key events, document.body is null!?")
       body.onkeydown = ::keyDown
       body.onkeyup = ::keyUp
       body.onkeypress = ::keyPress

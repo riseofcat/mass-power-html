@@ -1,5 +1,6 @@
 package domain.dots
 
+import com.riseofcat.lib.*
 import kuden.*
 import org.khronos.webgl.*
 import util.*
@@ -42,7 +43,7 @@ void main(void) {
   init {
     html.webgl.apply {
       useProgram(shaderProgram)
-      bindBuffer(WebGLRenderingContext.ARRAY_BUFFER,createBuffer() ?: JsUtil.error("Unable to create webgl buffer!"))
+      bindBuffer(WebGLRenderingContext.ARRAY_BUFFER,createBuffer() ?: lib.log.fatalError("Unable to create webgl buffer!"))
       val location = getAttribLocation(shaderProgram,"a_position")//0
       enableVertexAttribArray(location)
       vertexAttribPointer(location,2,WebGLRenderingContext.FLOAT,false,/*шаг*/2*4,0)
