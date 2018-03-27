@@ -57,7 +57,6 @@ attribute float a_rotation;
 attribute float a_divide;
 uniform mat4 u_projectionView;
 varying vec2 v_textCoord;
-varying vec4 myColor;
 varying vec4 arr[gl_MaxVaryingVectors-2];//28-29
 varying float v_divide;
 
@@ -81,8 +80,6 @@ void main(void) {
   v_divide = a_divide;
   v_textCoord = a_texCoord;
   vec4 scaledBox = vec4(a_boundingBox, 1.0, 1.0) * scale(a_scale) * rotateZ(a_rotation);
-  //myColor = vec4(1.0,0.3,0.3,0.5);
-  myColor = vec4(1.0,1.0,1.0,1.0);
   gl_Position = u_projectionView * vec4(a_position + scaledBox.xy, 1.0, 1.0);
   }
 """,WGL.VERTEX_SHADER)
@@ -97,64 +94,16 @@ uniform lowp int u_test_array_size;
 uniform lowp float u_arr[3];
 uniform lowp vec4 u_vec_arr[gl_MaxVertexUniformVectors/2 - 5];
 varying vec2 v_textCoord;
-varying vec4 myColor;
 varying vec4 arr[gl_MaxVaryingVectors-2];//28-29
 varying float v_divide;
 void main(void) {
-  gl_FragColor = myColor * texture2D(u_sampler, v_textCoord);
+  gl_FragColor = texture2D(u_sampler, v_textCoord);
   gl_FragColor.a = gl_FragColor.a / v_divide/v_divide/v_divide/v_divide/v_divide/v_divide;
   //gl_FragColor.a = gl_FragColor.a * (u_arr[0] + u_arr[1]);
 }
 """,WGL.FRAGMENT_SHADER))
-  val shaderProgram2:WebGLProgram = gl.createWebGLProgram(
-    vertex,
-    gl.compileShader(/*language=GLSL*/
-      """
-precision mediump float;
-uniform sampler2D u_sampler;
-uniform lowp int u_test_array_size;
-uniform lowp float u_arr[3];
-uniform lowp vec4 u_vec_arr[gl_MaxVertexUniformVectors/2 - 5];
-varying vec2 v_textCoord;
-varying vec4 myColor;
-varying vec4 arr[gl_MaxVaryingVectors-2];//28-29
-varying float v_divide;
-void main(void) {
-  gl_FragColor = myColor;
-}
-""",WGL.FRAGMENT_SHADER))
-
   val shaderProgram3:WebGLProgram = gl.createWebGLProgram(
-    gl.compileShader(/*language=GLSL*/"""
-attribute vec2 a_position;
-attribute vec2 a_boundingBox;
-attribute vec2 a_texCoord;
-attribute float a_scale;
-attribute float a_rotation;
-attribute float a_divide;
-uniform mat4 u_projectionView;
-
-mat4 scale(float scale) {
-  return mat4(
-    vec4(scale, 0.0,   0.0,   0.0),
-    vec4(0.0,   scale, 0.0,   0.0),
-    vec4(0.0,   0.0,   scale, 0.0),
-    vec4(0.0,   0.0,   0.0,   1.0)
-  );
-}
-mat4 rotateZ(float angle) {
-  return mat4(
-    vec4(cos(angle),   sin(angle),  0.0,  0.0),
-    vec4(-sin(angle),  cos(angle),  0.0,  0.0),
-    vec4(0.0,          0.0,         1.0,  0.0),
-    vec4(0.0,          0.0,         0.0,  1.0)
-  );
-}
-void main(void) {
-  vec4 scaledBox = vec4(a_boundingBox, 1.0, 1.0) * scale(a_scale) * rotateZ(a_rotation);
-  gl_Position = u_projectionView * vec4(a_position + scaledBox.xy, 1.0, 1.0);
-  }
-""",WGL.VERTEX_SHADER),
+    vertex,
     gl.compileShader(/*language=GLSL*/
       """
 precision mediump float;
@@ -199,17 +148,6 @@ void main(void) {
       gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram,"u_projectionView"),false,(TextureData(view.projectionMatrix)).vMatrix.toFloat32Arr())
       gl.uniform1i(gl.getUniformLocation(shaderProgram,"u_test_array_size"),5)
       gl.uniform1fv(gl.getUniformLocation(shaderProgram,"u_arr[0]"),arrayOf(0.1f,0.1f))
-
-      gl.useProgram(shaderProgram2)
-      attributes.forEach {
-        gl.enableVertexAttribArray(it.location)
-        gl.vertexAttribPointer(it.location,it.attr.numElements,WGL.FLOAT,false,/*шаг*/verticesBlockSize*4,it.offset*4)//todo попробовать разные типы а также lowp precision
-        if(false) gl.disableVertexAttribArray(it.location)//Если нужно после рендера отключить эти атрибуты (вероятно чтобы иметь возможность задать новые атрибуты для другого шейдера)
-      }
-      if(false) gl.uniform1i(gl.getUniformLocation(shaderProgram2,"u_sampler"),0)
-      gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram2,"u_projectionView"),false,(TextureData(view.projectionMatrix)).vMatrix.toFloat32Arr())
-      gl.uniform1i(gl.getUniformLocation(shaderProgram2,"u_test_array_size"),5)
-      gl.uniform1fv(gl.getUniformLocation(shaderProgram2,"u_arr[0]"),arrayOf(0.1f,0.1f))
 
       gl.useProgram(shaderProgram3)
       attributes.forEach {
@@ -266,12 +204,10 @@ void main(void) {
   var previousTime = time
   var fps30 = 30f
   var fps500 = 30f
-
   var srcFactorGlow = WGL.SRC_ALPHA
   var dstFactorGlow = if(false) WGL.DST_ALPHA else WGL.ONE_MINUS_SRC_ALPHA
   var srcFactor:Int = WGL.SRC_ALPHA
   var dstFactor = WGL.ONE_MINUS_SRC_ALPHA
-
   val imgRed = ImgData("img/smiley_small_rect_red.png")
   val imgGreen = ImgData("img/smiley_small_rect_green.png")
   val imgBlue = ImgData("img/smiley_small_rect_blue.png")
@@ -295,19 +231,16 @@ void main(void) {
     html.canvas2d.fillText(ServerCommon.test(),200.0,600.0)
     gl.clearColor(0f,0f,0f,1f)
     gl.clear(WGL.COLOR_BUFFER_BIT)
-
     val state = model?.calcDisplayState()
     gl.useProgram(shaderProgram3)
     if(true)state?.reactive?.forEach {
-      it.pos.x
-      val scl = 0.1f
+      val scl = 5f
       val fan = CircleData(srcFactor, dstFactor){cos, sin->
-        val size=it.radius*30
-        floatArrayOf(it.pos.x.toFloat(),it.pos.y.toFloat(),cos*size/2,sin*size/2,cos*0.5f+0.5f,sin*0.5f+0.5f,scl,0f,1f)
+        val size=it.radius
+        floatArrayOf(it.pos.x.toFloat(),it.pos.y.toFloat(),cos*size/2,sin*size/2,0f,0f,scl,0f,1f)
       }
       renderCircle10(null,fan)
     }
-
     gl.useProgram(shaderProgram)
     mutableListOf<RenderData>(/*RenderData(500f,500f,someWdthInGameCoords,imgGreen)*/).apply {
       if(state != null) {
@@ -336,6 +269,14 @@ void main(void) {
           img.src = it.imgData.url
         }
         cache.texture?.apply {
+          if(true) render(glTexture,Mode.TRIANGLE,
+            it.x,it.y,left,bottom,0f,0f,it.scale,0f,1f,
+            it.x,it.y,left,top,0f,1f,it.scale,0f,1f,
+            it.x,it.y,right,top,1f,1f,it.scale,0f,1f,
+
+            it.x,it.y,right,top,1f,1f,it.scale,0f,1f,
+            it.x,it.y,right,bottom,1f,0f,it.scale,0f,1f,
+            it.x,it.y,left,bottom,0f,0f,it.scale,0f,1f)
           val fan = CircleData(srcFactor, dstFactor) {cos,sin->
             floatArrayOf(it.x,it.y,cos*width/2,sin*height/2,cos*0.5f+0.5f,sin*0.5f+0.5f,it.scale,0f,1f)
           }
@@ -345,17 +286,6 @@ void main(void) {
             floatArrayOf(it.x,it.y,cos*width*glowRadius,sin*height*glowRadius,0.5f+cos*0.5f,0.5f+sin*0.5f,it.scale,0f,DIVIDE)
           }
           renderCircle10(glTexture,fan,strip)
-        }
-        if(true) cache.texture?.apply {
-          //Рисует прямоугольники
-          render(glTexture, Mode.TRIANGLE,
-            it.x,it.y,left,bottom,0f,0f,it.scale,0f, 1f,
-            it.x,it.y,left,top,0f,1f,it.scale,0f, 1f,
-            it.x,it.y,right,top,1f,1f,it.scale,0f, 1f,
-
-            it.x,it.y,right,top,1f,1f,it.scale,0f, 1f,
-            it.x,it.y,right,bottom,1f,0f,it.scale,0f,1f,
-            it.x,it.y,left,bottom,0f,0f,it.scale,0f, 1f)
         }
       }
     window.requestAnimationFrame(::gameLoop)
