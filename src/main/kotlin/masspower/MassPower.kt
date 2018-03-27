@@ -301,9 +301,8 @@ void main(void) {
     if(true)state?.reactive?.forEach {
       it.pos.x
       val scl = 0.1f
-      //поехал центр, было: it.x,it.y,0f,0f,0.5f,0.5f,it.scale,0f,0f
-      renderCircle8(null, it.pos.x.toFloat(),it.pos.y.toFloat(),0f,0f,0.5f,0.5f,scl,0f,0f) {cos, sin->
-        val size=it.radius*10
+      renderCircle8(null) {cos, sin->
+        val size=it.radius*30
         floatArrayOf(it.pos.x.toFloat(),it.pos.y.toFloat(),cos*size/2,sin*size/2,cos*0.5f+0.5f,sin*0.5f+0.5f,scl,0f,1f)
       }
     }
@@ -334,7 +333,7 @@ void main(void) {
           img.src = it.imgData.url
         }
         cache.texture?.apply {
-          renderCircle16(glTexture, it.x,it.y,0f,0f,0.5f,0.5f,it.scale,0f,0f) {cos,sin->
+          renderCircle16(glTexture) {cos,sin->
             val DIVIDE = 1.65f
             val glowRadius = 0.75f
             CircleFanStrip(floatArrayOf(it.x,it.y,cos*width/2,sin*height/2,cos*0.5f+0.5f,sin*0.5f+0.5f,it.scale,0f,1f),
@@ -365,7 +364,8 @@ void main(void) {
   val sin16 = radian16.map {kotlin.math.sin(it)}.toFloatArray()
   data class CircleFanStrip(val fan:FloatArray,val strip:FloatArray)
 
-  fun renderCircle8(texture:WebGLTexture?, vararg center:Float,fan:(cos:Float, sin:Float)->FloatArray) {//noinline better performance
+  fun renderCircle8(texture:WebGLTexture?,fan:(cos:Float, sin:Float)->FloatArray) {//noinline better performance
+    val center2 = fan(0f,0f)
     val f0 = fan(cos8[0], sin8[0])
     val f1 = fan(cos8[1], sin8[1])
     val f2 = fan(cos8[2], sin8[2])
@@ -375,10 +375,12 @@ void main(void) {
     val f6 = fan(cos8[6], sin8[6])
     val f7 = fan(cos8[7], sin8[7])
     if(BLEND && DYNAMIC_BLEND) gl.blendFunc(srcFactor,dstFactor)
-    render(texture, Mode.TRIANGLE_FAN,*center,*f0,*f1,*f2,*f3,*f4,*f5,*f6,*f7,*f0)
+    render(texture, Mode.TRIANGLE_FAN,*center2,*f0,*f1,*f2,*f3,*f4,*f5,*f6,*f7,*f0)
   }
 
-  fun renderCircle16(texture:WebGLTexture, vararg center:Float,fan:(cos:Float, sin:Float)->CircleFanStrip) {//noinline better performance
+  fun renderCircle16(texture:WebGLTexture?, fan:(cos:Float, sin:Float)->CircleFanStrip) {//noinline better performance
+    //todo разбить на 2 метода - render circle и render fan
+    val center2 = fan(0f,0f).fan
     val (f0,s0) = fan(cos16[0], sin16[0])
     val (f1,s1) = fan(cos16[1], sin16[1])
     val (f2,s2) = fan(cos16[2], sin16[2])
@@ -397,7 +399,7 @@ void main(void) {
     val (f15,s15) = fan(cos16[15], sin16[15])
     if(BLEND && DYNAMIC_BLEND) gl.blendFunc(srcFactor,dstFactor)
     if(DYNAMIC_SHADER) gl.useProgram(shaderProgram)
-    render(texture, Mode.TRIANGLE_FAN,*center,*f0,*f1,*f2,*f3,*f4,*f5,*f6,*f7,*f8,*f9,*f10,*f11,*f12,*f13,*f14,*f15,*f0)
+    render(texture, Mode.TRIANGLE_FAN,*center2,*f0,*f1,*f2,*f3,*f4,*f5,*f6,*f7,*f8,*f9,*f10,*f11,*f12,*f13,*f14,*f15,*f0)
     if(BLEND && DYNAMIC_BLEND) gl.blendFunc(srcFactorGlow,dstFactorGlow)
     render(texture, Mode.TRIANGLE_STRIP,*f0,*s0,*f1,*s1,*f2,*s2,*f3,*s3,*f4,*s4,*f5,*s5,*f6,*s6,*f7,*s7,*f8,*s8,*f9,*s9,*f10,*s10,*f11,*s11,*f12,*s12,*f13,*s13,*f14,*s14,*f15,*s15,*f0,*s0)
   }
