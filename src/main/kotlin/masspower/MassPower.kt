@@ -266,8 +266,8 @@ void main(void) {
 
   val time get() = Date().getTime()/1000f
   var previousTime = time
-  val averageConst = 30
-  var fps = 60f
+  var fps30 = 30f
+  var fps500 = 30f
 
   var srcFactorGlow = WGL.SRC_ALPHA
   var dstFactorGlow = if(false) WGL.DST_ALPHA else WGL.ONE_MINUS_SRC_ALPHA
@@ -284,13 +284,15 @@ void main(void) {
   val PlayerId.color get() = colors.let {it[id%it.size]}
 
   private fun gameLoop(милисекундСоСтараПлюсБездействие:Double):Unit = lib.saveInvoke {
-    fps = (fps*averageConst+1f/(time-previousTime)).toFloat()/(averageConst+1)
+    fps30 = (fps30*30+1f/(time-previousTime)).toFloat()/(30+1)
+    fps500 = (fps500*200+1f/(time-previousTime)).toFloat()/(200+1)
     previousTime = time
     if(false) resize()
     html.canvas2d.clearRect(0.0,0.0,view.gameWidth.toDouble(),view.gameHeight.toDouble())
     html.canvas2d.fillStyle = "white"
     html.canvas2d.font = "bold 24pt Arial"
-    html.canvas2d.fillText("fps: $fps",200.0,500.0)
+    html.canvas2d.fillText("fps30: $fps30",200.0,450.0)
+    html.canvas2d.fillText("fps500: $fps500",200.0,500.0)
     html.canvas2d.fillText(Gen.date(),200.0,550.0)
     html.canvas2d.fillText(ServerCommon.test(),200.0,600.0)
     gl.clearColor(0f,0f,0f,1f)
