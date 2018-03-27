@@ -13,7 +13,7 @@ import kotlin.browser.*
 import kotlin.js.*
 import org.khronos.webgl.WebGLRenderingContext as WGL
 
-const val DYNAMIC_SHADER = true//default true +1 fps
+const val DYNAMIC_SHADER = false//default true +1 fps
 const val DYNAMIC_TEXTURE = true//default true +2 fps
 const val BLEND = true//не влияет на производительность
 const val DYNAMIC_BLEND = true//не влияет на производительность
@@ -200,26 +200,24 @@ void main(void) {
       gl.uniform1i(gl.getUniformLocation(shaderProgram,"u_test_array_size"),5)
       gl.uniform1fv(gl.getUniformLocation(shaderProgram,"u_arr[0]"),arrayOf(0.1f,0.1f))
 
-      if(DYNAMIC_SHADER) {
-        gl.useProgram(shaderProgram2)
-        attributes.forEach {
-          gl.enableVertexAttribArray(it.location)
-          gl.vertexAttribPointer(it.location,it.attr.numElements,WGL.FLOAT,false,/*шаг*/verticesBlockSize*4,it.offset*4)//todo попробовать разные типы а также lowp precision
-          if(false) gl.disableVertexAttribArray(it.location)//Если нужно после рендера отключить эти атрибуты (вероятно чтобы иметь возможность задать новые атрибуты для другого шейдера)
-        }
-        if(false) gl.uniform1i(gl.getUniformLocation(shaderProgram2,"u_sampler"),0)
-        gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram2,"u_projectionView"),false,(TextureData(view.projectionMatrix)).vMatrix.toFloat32Arr())
-        gl.uniform1i(gl.getUniformLocation(shaderProgram2,"u_test_array_size"),5)
-        gl.uniform1fv(gl.getUniformLocation(shaderProgram2,"u_arr[0]"),arrayOf(0.1f,0.1f))
-
-        gl.useProgram(shaderProgram3)
-        attributes.forEach {
-          gl.enableVertexAttribArray(it.location)
-          gl.vertexAttribPointer(it.location,it.attr.numElements,WGL.FLOAT,false,/*шаг*/verticesBlockSize*4,it.offset*4)
-        }
-        gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram3,"u_projectionView"),false,(TextureData(view.projectionMatrix)).vMatrix.toFloat32Arr())
-        gl.uniform1i(gl.getUniformLocation(shaderProgram3,"u_test_array_size"),5)
+      gl.useProgram(shaderProgram2)
+      attributes.forEach {
+        gl.enableVertexAttribArray(it.location)
+        gl.vertexAttribPointer(it.location,it.attr.numElements,WGL.FLOAT,false,/*шаг*/verticesBlockSize*4,it.offset*4)//todo попробовать разные типы а также lowp precision
+        if(false) gl.disableVertexAttribArray(it.location)//Если нужно после рендера отключить эти атрибуты (вероятно чтобы иметь возможность задать новые атрибуты для другого шейдера)
       }
+      if(false) gl.uniform1i(gl.getUniformLocation(shaderProgram2,"u_sampler"),0)
+      gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram2,"u_projectionView"),false,(TextureData(view.projectionMatrix)).vMatrix.toFloat32Arr())
+      gl.uniform1i(gl.getUniformLocation(shaderProgram2,"u_test_array_size"),5)
+      gl.uniform1fv(gl.getUniformLocation(shaderProgram2,"u_arr[0]"),arrayOf(0.1f,0.1f))
+
+      gl.useProgram(shaderProgram3)
+      attributes.forEach {
+        gl.enableVertexAttribArray(it.location)
+        gl.vertexAttribPointer(it.location,it.attr.numElements,WGL.FLOAT,false,/*шаг*/verticesBlockSize*4,it.offset*4)
+      }
+      gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram3,"u_projectionView"),false,(TextureData(view.projectionMatrix)).vMatrix.toFloat32Arr())
+      gl.uniform1i(gl.getUniformLocation(shaderProgram3,"u_test_array_size"),5)
 
       gl.enable(WGL.BLEND)
       if(BLEND && !DYNAMIC_BLEND) gl.blendFunc(srcFactor,dstFactor)
@@ -271,7 +269,7 @@ void main(void) {
 
   var srcFactorGlow = WGL.SRC_ALPHA
   var dstFactorGlow = if(false) WGL.DST_ALPHA else WGL.ONE_MINUS_SRC_ALPHA
-  var srcFactor = WGL.SRC_ALPHA
+  var srcFactor:Int = WGL.SRC_ALPHA
   var dstFactor = WGL.ONE_MINUS_SRC_ALPHA
 
   val imgRed = ImgData("img/smiley_small_rect_red.png")
@@ -299,15 +297,18 @@ void main(void) {
     gl.clear(WGL.COLOR_BUFFER_BIT)
 
     val state = model?.calcDisplayState()
-    if(DYNAMIC_SHADER) gl.useProgram(shaderProgram3)
+    gl.useProgram(shaderProgram3)
     if(true)state?.reactive?.forEach {
       it.pos.x
       val scl = 0.1f
-      renderCircle8(null) {cos, sin->
+      val fan = CircleData(srcFactor, dstFactor){cos, sin->
         val size=it.radius*30
         floatArrayOf(it.pos.x.toFloat(),it.pos.y.toFloat(),cos*size/2,sin*size/2,cos*0.5f+0.5f,sin*0.5f+0.5f,scl,0f,1f)
       }
+      renderCircle16(null,fan)
     }
+
+    gl.useProgram(shaderProgram)
     mutableListOf<RenderData>(/*RenderData(500f,500f,someWdthInGameCoords,imgGreen)*/).apply {
       if(state != null) {
         state.foods.forEach {add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),it.radius*2,imgGray))}
@@ -335,12 +336,15 @@ void main(void) {
           img.src = it.imgData.url
         }
         cache.texture?.apply {
-          renderCircle16(glTexture) {cos,sin->
+          val fan = CircleData(srcFactor, dstFactor) {cos,sin->
+            floatArrayOf(it.x,it.y,cos*width/2,sin*height/2,cos*0.5f+0.5f,sin*0.5f+0.5f,it.scale,0f,1f)
+          }
+          val strip = CircleData(srcFactor, dstFactor) {cos,sin->
             val DIVIDE = 1.65f
             val glowRadius = 0.75f
-            CircleFanStrip(floatArrayOf(it.x,it.y,cos*width/2,sin*height/2,cos*0.5f+0.5f,sin*0.5f+0.5f,it.scale,0f,1f),
-              floatArrayOf(it.x,it.y,cos*width*glowRadius,sin*height*glowRadius,0.5f+cos*0.5f,0.5f+sin*0.5f,it.scale,0f,DIVIDE))
+            floatArrayOf(it.x,it.y,cos*width*glowRadius,sin*height*glowRadius,0.5f+cos*0.5f,0.5f+sin*0.5f,it.scale,0f,DIVIDE)
           }
+          renderCircle16(glTexture,fan,strip)
         }
         if(true) cache.texture?.apply {
           //Рисует прямоугольники
@@ -366,45 +370,50 @@ void main(void) {
   val sin16 = radian16.map {kotlin.math.sin(it)}.toFloatArray()
   data class CircleFanStrip(val fan:FloatArray,val strip:FloatArray)
 
-  fun renderCircle8(texture:WebGLTexture?,fan:(cos:Float, sin:Float)->FloatArray) {//noinline better performance
-    val center2 = fan(0f,0f)
-    val f0 = fan(cos8[0], sin8[0])
-    val f1 = fan(cos8[1], sin8[1])
-    val f2 = fan(cos8[2], sin8[2])
-    val f3 = fan(cos8[3], sin8[3])
-    val f4 = fan(cos8[4], sin8[4])
-    val f5 = fan(cos8[5], sin8[5])
-    val f6 = fan(cos8[6], sin8[6])
-    val f7 = fan(cos8[7], sin8[7])
+  class CircleData(val srcFactor:Int, val dstFactor:Int, val getArr:(cos:Float, sin:Float)->FloatArray)
+
+  fun renderCircle16(texture:WebGLTexture?, fan:CircleData, strip:CircleData? = null) {//noinline better performance
+    val center2 = fan.getArr(0f,0f)
+    val f0 = fan.getArr(cos16[0], sin16[0])
+    val f1 = fan.getArr(cos16[1], sin16[1])
+    val f2 = fan.getArr(cos16[2], sin16[2])
+    val f3 = fan.getArr(cos16[3], sin16[3])
+    val f4 = fan.getArr(cos16[4], sin16[4])
+    val f5 = fan.getArr(cos16[5], sin16[5])
+    val f6 = fan.getArr(cos16[6], sin16[6])
+    val f7 = fan.getArr(cos16[7], sin16[7])
+    val f8 = fan.getArr(cos16[8], sin16[8])
+    val f9 = fan.getArr(cos16[9], sin16[9])
+    val f10 = fan.getArr(cos16[10], sin16[10])
+    val f11 = fan.getArr(cos16[11], sin16[11])
+    val f12 = fan.getArr(cos16[12], sin16[12])
+    val f13 = fan.getArr(cos16[13], sin16[13])
+    val f14 = fan.getArr(cos16[14], sin16[14])
+    val f15 = fan.getArr(cos16[15], sin16[15])
     if(BLEND && DYNAMIC_BLEND) gl.blendFunc(srcFactor,dstFactor)
-    render(texture, Mode.TRIANGLE_FAN,*center2,*f0,*f1,*f2,*f3,*f4,*f5,*f6,*f7,*f0)
+    render(texture, Mode.TRIANGLE_FAN,*center2,*f0,*f1,*f2,*f3,*f4,*f5,*f6,*f7,*f8,*f9,*f10,*f11,*f12,*f13,*f14,*f15,*f0)
+    if(strip != null) {
+      val s0 = strip.getArr(cos16[0], sin16[0])
+      val s1 = strip.getArr(cos16[1], sin16[1])
+      val s2 = strip.getArr(cos16[2], sin16[2])
+      val s3 = strip.getArr(cos16[3], sin16[3])
+      val s4 = strip.getArr(cos16[4], sin16[4])
+      val s5 = strip.getArr(cos16[5], sin16[5])
+      val s6 = strip.getArr(cos16[6], sin16[6])
+      val s7 = strip.getArr(cos16[7], sin16[7])
+      val s8 = strip.getArr(cos16[8], sin16[8])
+      val s9 = strip.getArr(cos16[9], sin16[9])
+      val s10 = strip.getArr(cos16[10], sin16[10])
+      val s11 = strip.getArr(cos16[11], sin16[11])
+      val s12 = strip.getArr(cos16[12], sin16[12])
+      val s13 = strip.getArr(cos16[13], sin16[13])
+      val s14 = strip.getArr(cos16[14], sin16[14])
+      val s15 = strip.getArr(cos16[15], sin16[15])
+      if(BLEND && DYNAMIC_BLEND) gl.blendFunc(srcFactorGlow,dstFactorGlow)
+      render(texture, Mode.TRIANGLE_STRIP,*f0,*s0,*f1,*s1,*f2,*s2,*f3,*s3,*f4,*s4,*f5,*s5,*f6,*s6,*f7,*s7,*f8,*s8,*f9,*s9,*f10,*s10,*f11,*s11,*f12,*s12,*f13,*s13,*f14,*s14,*f15,*s15,*f0,*s0)
+    }
   }
 
-  fun renderCircle16(texture:WebGLTexture?, fan:(cos:Float, sin:Float)->CircleFanStrip) {//noinline better performance
-    //todo разбить на 2 метода - render circle и render fan
-    val center2 = fan(0f,0f).fan
-    val (f0,s0) = fan(cos16[0], sin16[0])
-    val (f1,s1) = fan(cos16[1], sin16[1])
-    val (f2,s2) = fan(cos16[2], sin16[2])
-    val (f3,s3) = fan(cos16[3], sin16[3])
-    val (f4,s4) = fan(cos16[4], sin16[4])
-    val (f5,s5) = fan(cos16[5], sin16[5])
-    val (f6,s6) = fan(cos16[6], sin16[6])
-    val (f7,s7) = fan(cos16[7], sin16[7])
-    val (f8,s8) = fan(cos16[8], sin16[8])
-    val (f9,s9) = fan(cos16[9], sin16[9])
-    val (f10,s10) = fan(cos16[10], sin16[10])
-    val (f11,s11) = fan(cos16[11], sin16[11])
-    val (f12,s12) = fan(cos16[12], sin16[12])
-    val (f13,s13) = fan(cos16[13], sin16[13])
-    val (f14,s14) = fan(cos16[14], sin16[14])
-    val (f15,s15) = fan(cos16[15], sin16[15])
-    if(BLEND && DYNAMIC_BLEND) gl.blendFunc(srcFactor,dstFactor)
-    if(DYNAMIC_SHADER) gl.useProgram(shaderProgram)
-    render(texture, Mode.TRIANGLE_FAN,*center2,*f0,*f1,*f2,*f3,*f4,*f5,*f6,*f7,*f8,*f9,*f10,*f11,*f12,*f13,*f14,*f15,*f0)
-    if(BLEND && DYNAMIC_BLEND) gl.blendFunc(srcFactorGlow,dstFactorGlow)
-    render(texture, Mode.TRIANGLE_STRIP,*f0,*s0,*f1,*s1,*f2,*s2,*f3,*s3,*f4,*s4,*f5,*s5,*f6,*s6,*f7,*s7,*f8,*s8,*f9,*s9,*f10,*s10,*f11,*s11,*f12,*s12,*f13,*s13,*f14,*s14,*f15,*s15,*f0,*s0)
-  }
 
   inline fun render(texture:WebGLTexture?, mode:Mode,vararg allArgs:Float) = render(texture, mode,allArgs)
   inline fun render(texture:WebGLTexture?, mode:Mode,allArgs:FloatArray) = render(mode,if(true) allArgs as Float32Array else Float32Array(allArgs.toTypedArray()),texture,allArgs.size)
