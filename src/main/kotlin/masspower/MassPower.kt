@@ -302,7 +302,7 @@ void main(void) {
       it.pos.x
       val scl = 0.1f
       //поехал центр, было: it.x,it.y,0f,0f,0.5f,0.5f,it.scale,0f,0f
-      renderCircle8(it.pos.x.toFloat(),it.pos.y.toFloat(),0f,0f,0.5f,0.5f,scl,0f,0f) {cos, sin->
+      renderCircle8(null, it.pos.x.toFloat(),it.pos.y.toFloat(),0f,0f,0.5f,0.5f,scl,0f,0f) {cos, sin->
         val size=it.radius*10
         floatArrayOf(it.pos.x.toFloat(),it.pos.y.toFloat(),cos*size/2,sin*size/2,cos*0.5f+0.5f,sin*0.5f+0.5f,scl,0f,1f)
       }
@@ -334,7 +334,7 @@ void main(void) {
           img.src = it.imgData.url
         }
         cache.texture?.apply {
-          glTexture.renderCircle16(it.x,it.y,0f,0f,0.5f,0.5f,it.scale,0f,0f) {cos,sin->
+          renderCircle16(glTexture, it.x,it.y,0f,0f,0.5f,0.5f,it.scale,0f,0f) {cos,sin->
             val DIVIDE = 1.65f
             val glowRadius = 0.75f
             CircleFanStrip(floatArrayOf(it.x,it.y,cos*width/2,sin*height/2,cos*0.5f+0.5f,sin*0.5f+0.5f,it.scale,0f,1f),
@@ -343,7 +343,7 @@ void main(void) {
         }
         if(true) cache.texture?.apply {
           //Рисует прямоугольники
-          glTexture.render(Mode.TRIANGLE,
+          render(glTexture, Mode.TRIANGLE,
             it.x,it.y,left,bottom,0f,0f,it.scale,0f, 1f,
             it.x,it.y,left,top,0f,1f,it.scale,0f, 1f,
             it.x,it.y,right,top,1f,1f,it.scale,0f, 1f,
@@ -365,7 +365,7 @@ void main(void) {
   val sin16 = radian16.map {kotlin.math.sin(it)}.toFloatArray()
   data class CircleFanStrip(val fan:FloatArray,val strip:FloatArray)
 
-  fun renderCircle8(vararg center:Float,fan:(cos:Float, sin:Float)->FloatArray) {//noinline better performance
+  fun renderCircle8(texture:WebGLTexture?, vararg center:Float,fan:(cos:Float, sin:Float)->FloatArray) {//noinline better performance
     val f0 = fan(cos8[0], sin8[0])
     val f1 = fan(cos8[1], sin8[1])
     val f2 = fan(cos8[2], sin8[2])
@@ -375,12 +375,10 @@ void main(void) {
     val f6 = fan(cos8[6], sin8[6])
     val f7 = fan(cos8[7], sin8[7])
     if(BLEND && DYNAMIC_BLEND) gl.blendFunc(srcFactor,dstFactor)
-    render(Mode.TRIANGLE_FAN,*center,*f0,*f1,*f2,*f3,*f4,*f5,*f6,*f7,*f0)
+    render(texture, Mode.TRIANGLE_FAN,*center,*f0,*f1,*f2,*f3,*f4,*f5,*f6,*f7,*f0)
   }
-  inline fun render(mode:Mode,vararg allArgs:Float) = render(mode,allArgs)
-  inline fun render(mode:Mode,allArgs:FloatArray) = render(mode,if(true) allArgs as Float32Array else Float32Array(allArgs.toTypedArray()),null,allArgs.size)
 
-  fun WebGLTexture.renderCircle16(vararg center:Float,fan:(cos:Float, sin:Float)->CircleFanStrip) {//noinline better performance
+  fun renderCircle16(texture:WebGLTexture, vararg center:Float,fan:(cos:Float, sin:Float)->CircleFanStrip) {//noinline better performance
     val (f0,s0) = fan(cos16[0], sin16[0])
     val (f1,s1) = fan(cos16[1], sin16[1])
     val (f2,s2) = fan(cos16[2], sin16[2])
@@ -399,15 +397,15 @@ void main(void) {
     val (f15,s15) = fan(cos16[15], sin16[15])
     if(BLEND && DYNAMIC_BLEND) gl.blendFunc(srcFactor,dstFactor)
     if(DYNAMIC_SHADER) gl.useProgram(shaderProgram)
-    render(Mode.TRIANGLE_FAN,*center,*f0,*f1,*f2,*f3,*f4,*f5,*f6,*f7,*f8,*f9,*f10,*f11,*f12,*f13,*f14,*f15,*f0)
+    render(texture, Mode.TRIANGLE_FAN,*center,*f0,*f1,*f2,*f3,*f4,*f5,*f6,*f7,*f8,*f9,*f10,*f11,*f12,*f13,*f14,*f15,*f0)
     if(BLEND && DYNAMIC_BLEND) gl.blendFunc(srcFactorGlow,dstFactorGlow)
-    render(Mode.TRIANGLE_STRIP,*f0,*s0,*f1,*s1,*f2,*s2,*f3,*s3,*f4,*s4,*f5,*s5,*f6,*s6,*f7,*s7,*f8,*s8,*f9,*s9,*f10,*s10,*f11,*s11,*f12,*s12,*f13,*s13,*f14,*s14,*f15,*s15,*f0,*s0)
+    render(texture, Mode.TRIANGLE_STRIP,*f0,*s0,*f1,*s1,*f2,*s2,*f3,*s3,*f4,*s4,*f5,*s5,*f6,*s6,*f7,*s7,*f8,*s8,*f9,*s9,*f10,*s10,*f11,*s11,*f12,*s12,*f13,*s13,*f14,*s14,*f15,*s15,*f0,*s0)
   }
 
-  inline fun WebGLTexture.render(mode:Mode,vararg allArgs:Float) = render(mode,allArgs)
-  inline fun WebGLTexture.render(mode:Mode,allArgs:FloatArray) = render(mode,if(true) allArgs as Float32Array else Float32Array(allArgs.toTypedArray()),this,allArgs.size)
+  inline fun render(texture:WebGLTexture?, mode:Mode,vararg allArgs:Float) = render(texture, mode,allArgs)
+  inline fun render(texture:WebGLTexture?, mode:Mode,allArgs:FloatArray) = render(mode,if(true) allArgs as Float32Array else Float32Array(allArgs.toTypedArray()),texture,allArgs.size)
   inline fun MutableList<Float>.vert(vararg args:Float) = addAll(args.toList())//todo check why asList doesn't working
-  inline fun WebGLTexture.render(mode:Mode,lambda:MutableList<Float>.()->Unit) = render(mode,arrayListOf<Float>().also {it.lambda()}.toFloatArray())
+  inline fun render(texture:WebGLTexture?, mode:Mode,lambda:MutableList<Float>.()->Unit) = render(texture, mode,arrayListOf<Float>().also {it.lambda()}.toFloatArray())
   inline fun render(mode:Mode,mesh:Float32Array,glTexture:WebGLTexture?,allFloatArgsCount:Int) {
     lib.debug {
       if(allFloatArgsCount<=0) lib.log.error("allFloatArgsCount<=0")
