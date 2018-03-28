@@ -45,14 +45,13 @@ class MassPower(val view:View = FixedWidth(1500f,1000f,1000f)) {
   val html = HTMLElements()
   val gl get() = html.webgl
   val vertex = gl.compileShader(/*language=GLSL*/"""
-//Если атрибут в шейдере не используется, то при компиляции об будет вырезан, и могут возникнуть ошибки "enableVertexAttribArray: index out of range"\
-attribute vec2 a_texCoord;
+//Если атрибут в шейдере не используется, то при компиляции об будет вырезан, и могут возникнуть ошибки "enableVertexAttribArray: index out of range"
+attribute float a_radius;//радиус от 0 до 1 внутри круга и от 1 до ... вне круга
 attribute vec2 a_position;//игровые координаты
 attribute vec2 a_boundingBox;
 attribute float a_scale;//todo сделать uniform для всех шейдеров gameScale
 attribute float a_divide;
 attribute float a_angle;
-attribute float a_radius;//радиус от 0 до 1 внутри круга и от 1 до ... вне круга//todo move first
 //attribute float a_texture_width;
 //attribute float a_texture_height;
 
@@ -73,7 +72,6 @@ mat4 scale(float scale) {
   );
 }
 void main(void) {
-  vec2 stub = a_texCoord;
   v_divide = a_divide;
   v_textCoord = vec2(0.5 + 0.5*cos(a_angle)*a_radius, 0.5 + 0.5*sin(a_angle)*a_radius);
   vec4 scaledBox = vec4(a_boundingBox, 1.0, 1.0) * scale(a_scale);// * rotateZ(a_rotation);
@@ -105,7 +103,7 @@ void main(void) {
   gl_FragColor = vec4(0.3,0.3,0.3,0.4);
 }
 """,WGL.FRAGMENT_SHADER))
-  val attributes = listOf(Attr("a_radius",1), Attr("a_position",2),Attr("a_boundingBox",2),Attr("a_texCoord",2),Attr("a_scale",1),Attr("a_divide",1), Attr("a_angle",1)).run {
+  val attributes = listOf(Attr("a_radius",1), Attr("a_position",2),Attr("a_boundingBox",2),Attr("a_scale",1),Attr("a_divide",1), Attr("a_angle",1)).run {
     val result = mutableListOf<IterAttr>()
     var currentSize = 0
     forEach {
@@ -228,7 +226,7 @@ void main(void) {
       val scl = gameScale
       val fan = CircleData(defaultBlend){cos, sin, angle->
         val size=it.radius
-        floatArrayOf(it.pos.x.toFloat(),it.pos.y.toFloat(),cos*size/2,sin*size/2,0f,0f,scl,1f, angle)
+        floatArrayOf(it.pos.x.toFloat(),it.pos.y.toFloat(),cos*size/2,sin*size/2,scl,1f, angle)
       }
       renderCircle10(null,fan)
     }
@@ -272,10 +270,10 @@ void main(void) {
               it.x,it.y,right,bottom,1f,0f,it.scale,1f,
               it.x,it.y,left,bottom,0f,0f,it.scale,1f)
           }
-          val fan = CircleData(defaultBlend) {cos,sin, angle-> floatArrayOf(it.x,it.y,cos*width/2,sin*height/2,cos*0.5f+0.5f,sin*0.5f+0.5f,it.scale,1f, angle)}
+          val fan = CircleData(defaultBlend) {cos,sin, angle-> floatArrayOf(it.x,it.y,cos*width/2,sin*height/2,it.scale,1f, angle)}
           val strip = CircleData(stripBlend) {cos,sin, angle->
             val glowRadius = 0.75f
-            floatArrayOf(it.x,it.y,cos*width*glowRadius,sin*height*glowRadius,0.5f+cos*0.5f,0.5f+sin*0.5f,it.scale,/*divide*/1.65f, angle)
+            floatArrayOf(it.x,it.y,cos*width*glowRadius,sin*height*glowRadius,it.scale,/*divide*/1.65f, angle)
           }
           renderCircle10(glTexture,fan,strip)
         }
