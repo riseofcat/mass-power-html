@@ -55,6 +55,7 @@ attribute vec2 a_boundingBox;
 attribute vec2 a_texCoord;
 attribute float a_scale;//todo сделать uniform для всех шейдеров gameScale
 attribute float a_divide;
+attribute float a_angle;
 
 uniform float u_game_width;
 uniform float u_game_height;
@@ -104,7 +105,7 @@ void main(void) {
   gl_FragColor = vec4(0.3,0.3,0.3,0.4);
 }
 """,WGL.FRAGMENT_SHADER))
-  val attributes = listOf(Attr("a_position",2),Attr("a_boundingBox",2),Attr("a_texCoord",2),Attr("a_scale",1),Attr("a_divide",1)).run {
+  val attributes = listOf(Attr("a_position",2),Attr("a_boundingBox",2),Attr("a_texCoord",2),Attr("a_scale",1),Attr("a_divide",1), Attr("a_angle",1)).run {
     val result = mutableListOf<IterAttr>()
     var currentSize = 0
     forEach {
@@ -225,9 +226,9 @@ void main(void) {
     gl.useProgram(shaderProgram3)
     if(true)state?.reactive?.forEach {
       val scl = gameScale
-      val fan = CircleData(defaultBlend){cos, sin->
+      val fan = CircleData(defaultBlend){cos, sin, angle->
         val size=it.radius
-        floatArrayOf(it.pos.x.toFloat(),it.pos.y.toFloat(),cos*size/2,sin*size/2,0f,0f,scl,1f)
+        floatArrayOf(it.pos.x.toFloat(),it.pos.y.toFloat(),cos*size/2,sin*size/2,0f,0f,scl,1f, angle)
       }
       renderCircle10(null,fan)
     }
@@ -271,10 +272,10 @@ void main(void) {
               it.x,it.y,right,bottom,1f,0f,it.scale,1f,
               it.x,it.y,left,bottom,0f,0f,it.scale,1f)
           }
-          val fan = CircleData(defaultBlend) {cos,sin-> floatArrayOf(it.x,it.y,cos*width/2,sin*height/2,cos*0.5f+0.5f,sin*0.5f+0.5f,it.scale,1f)}
-          val strip = CircleData(stripBlend) {cos,sin->
+          val fan = CircleData(defaultBlend) {cos,sin, angle-> floatArrayOf(it.x,it.y,cos*width/2,sin*height/2,cos*0.5f+0.5f,sin*0.5f+0.5f,it.scale,1f, angle)}
+          val strip = CircleData(stripBlend) {cos,sin, angle->
             val glowRadius = 0.75f
-            floatArrayOf(it.x,it.y,cos*width*glowRadius,sin*height*glowRadius,0.5f+cos*0.5f,0.5f+sin*0.5f,it.scale,/*divide*/1.65f)
+            floatArrayOf(it.x,it.y,cos*width*glowRadius,sin*height*glowRadius,0.5f+cos*0.5f,0.5f+sin*0.5f,it.scale,/*divide*/1.65f, angle)
           }
           renderCircle10(glTexture,fan,strip)
         }
@@ -287,7 +288,7 @@ void main(void) {
   val cos10 = radian10.map {kotlin.math.cos(it)}.toFloatArray()
   val sin10 = radian10.map {kotlin.math.sin(it)}.toFloatArray()
 
-  class CircleData(val blend:Blend, val getArr:(cos:Float, sin:Float)->FloatArray)
+  class CircleData(val blend:Blend, val getArr:(cos:Float, sin:Float, angle:Float)->FloatArray)
   data class Blend(val src:BlendFactor, val dst:BlendFactor)
   enum class BlendFactor(val value:Int) {
     SRC_COLOR(WGL.SRC_COLOR),
@@ -303,30 +304,30 @@ void main(void) {
 
   fun renderCircle10(texture:WebGLTexture?, fan:CircleData, strip:CircleData? = null) {//noinline better performance
     if(texture != null) gl.bindTexture(WGL.TEXTURE_2D,texture)//-2fps
-    val center = fan.getArr(0f,0f)
-    val f0 = fan.getArr(cos10[0], sin10[0])
-    val f1 = fan.getArr(cos10[1], sin10[1])
-    val f2 = fan.getArr(cos10[2], sin10[2])
-    val f3 = fan.getArr(cos10[3], sin10[3])
-    val f4 = fan.getArr(cos10[4], sin10[4])
-    val f5 = fan.getArr(cos10[5], sin10[5])
-    val f6 = fan.getArr(cos10[6], sin10[6])
-    val f7 = fan.getArr(cos10[7], sin10[7])
-    val f8 = fan.getArr(cos10[8], sin10[8])
-    val f9 = fan.getArr(cos10[9], sin10[9])
+    val center = fan.getArr(0f,0f, 0f)
+    val f0 = fan.getArr(cos10[0], sin10[0], radian10[0])
+    val f1 = fan.getArr(cos10[1], sin10[1], radian10[1])
+    val f2 = fan.getArr(cos10[2], sin10[2], radian10[2])
+    val f3 = fan.getArr(cos10[3], sin10[3], radian10[3])
+    val f4 = fan.getArr(cos10[4], sin10[4], radian10[4])
+    val f5 = fan.getArr(cos10[5], sin10[5], radian10[5])
+    val f6 = fan.getArr(cos10[6], sin10[6], radian10[6])
+    val f7 = fan.getArr(cos10[7], sin10[7], radian10[7])
+    val f8 = fan.getArr(cos10[8], sin10[8], radian10[8])
+    val f9 = fan.getArr(cos10[9], sin10[9], radian10[9])
     if(DYNAMIC_BLEND) gl.blendFunc(fan.blend.src.value,fan.blend.dst.value)
     render(Mode.TRIANGLE_FAN,*center,*f0,*f1,*f2,*f3,*f4,*f5,*f6,*f7,*f8,*f9,*f0)
     if(strip != null) {
-      val s0 = strip.getArr(cos10[0], sin10[0])
-      val s1 = strip.getArr(cos10[1], sin10[1])
-      val s2 = strip.getArr(cos10[2], sin10[2])
-      val s3 = strip.getArr(cos10[3], sin10[3])
-      val s4 = strip.getArr(cos10[4], sin10[4])
-      val s5 = strip.getArr(cos10[5], sin10[5])
-      val s6 = strip.getArr(cos10[6], sin10[6])
-      val s7 = strip.getArr(cos10[7], sin10[7])
-      val s8 = strip.getArr(cos10[8], sin10[8])
-      val s9 = strip.getArr(cos10[9], sin10[9])
+      val s0 = strip.getArr(cos10[0], sin10[0], radian10[0])
+      val s1 = strip.getArr(cos10[1], sin10[1], radian10[1])
+      val s2 = strip.getArr(cos10[2], sin10[2], radian10[2])
+      val s3 = strip.getArr(cos10[3], sin10[3], radian10[3])
+      val s4 = strip.getArr(cos10[4], sin10[4], radian10[4])
+      val s5 = strip.getArr(cos10[5], sin10[5], radian10[5])
+      val s6 = strip.getArr(cos10[6], sin10[6], radian10[6])
+      val s7 = strip.getArr(cos10[7], sin10[7], radian10[7])
+      val s8 = strip.getArr(cos10[8], sin10[8], radian10[8])
+      val s9 = strip.getArr(cos10[9], sin10[9], radian10[9])
       if(DYNAMIC_BLEND) gl.blendFunc(strip.blend.src.value,strip.blend.dst.value)
       render(Mode.TRIANGLE_STRIP,*f0,*s0,*f1,*s1,*f2,*s2,*f3,*s3,*f4,*s4,*f5,*s5,*f6,*s6,*f7,*s7,*f8,*s8,*f9,*s9,*f0,*s0)
     }
