@@ -24,13 +24,6 @@ abstract class View {
   abstract fun getHeight(aspectRation:Float):Float
   val gameWidth:Float get() = getWidth(window.innerWidth/window.innerHeight.toFloat())
   val gameHeight:Float get() = getHeight(window.innerWidth/window.innerHeight.toFloat())
-  val scaleMatrix:Float32Array get() {
-    return floatArrayOf(
-      2.0f/gameWidth,0.0f,0.0f,0.0f,
-      0.0f,2.0f/gameHeight,0.0f,0.0f,
-      0.0f,0.0f,1.0f,0.0f,
-      0.0f,0.0f,0.0f,1.0f) as Float32Array
-  }
 
   val windowWidth get() = window.innerWidth.min(window.innerHeight*gameWidth/gameHeight)
   val windowHeight get() = window.innerHeight.min(window.innerWidth*gameHeight/gameWidth)
@@ -63,10 +56,8 @@ attribute vec2 a_texCoord;
 attribute float a_scale;//todo сделать uniform для всех шейдеров gameScale
 attribute float a_divide;
 
-uniform mat4 u_scale_matrix;
-
-//uniform float u_game_width;
-//uniform float u_game_height;
+uniform float u_game_width;
+uniform float u_game_height;
 //uniform vec2 u_game_camera_x;
 //uniform vec2 u_game_camera_y;
 
@@ -92,8 +83,8 @@ void main(void) {
   v_divide = a_divide;
   v_textCoord = a_texCoord;
   vec4 scaledBox = vec4(a_boundingBox, 1.0, 1.0) * scale(a_scale);// * rotateZ(a_rotation);
-  mat4 resultTransform = u_scale_matrix;
-  gl_Position = u_scale_matrix * vec4(a_position + scaledBox.xy, 1.0, 1.0) - vec4(1.0, 1.0, 0.0, 0.0);
+  mat2 gameScale = mat2(2.0/u_game_width, 0.0, 0.0, 2.0/u_game_height);
+  gl_Position = vec4(gameScale*(a_position + scaledBox.xy), 1.0, 1.0) - vec4(1.0, 1.0, 0.0, 0.0);
   }
 """,WGL.VERTEX_SHADER)
   val shaderProgram:WebGLProgram = gl.createWebGLProgram(/*language=GLSL*/
@@ -157,7 +148,8 @@ void main(void) {
         if(false) gl.disableVertexAttribArray(it.location)//Если нужно после рендера отключить эти атрибуты (вероятно чтобы иметь возможность задать новые атрибуты для другого шейдера)
       }
       if(false) gl.uniform1i(gl.getUniformLocation(shaderProgram,"u_sampler"),0)
-      gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram,"u_scale_matrix"),false,view.scaleMatrix)
+      gl.uniform1f(gl.getUniformLocation(shaderProgram,"u_game_width"),view.gameWidth)
+      gl.uniform1f(gl.getUniformLocation(shaderProgram,"u_game_height"),view.gameHeight)
 //      gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram,"u_transform_matrix"),false,view.transformMatrix)
       gl.uniform1i(gl.getUniformLocation(shaderProgram,"u_test_array_size"),5)
       gl.uniform1fv(gl.getUniformLocation(shaderProgram,"u_arr[0]"),arrayOf(0.1f,0.1f))
@@ -167,7 +159,8 @@ void main(void) {
         gl.enableVertexAttribArray(it.location)
         gl.vertexAttribPointer(it.location,it.attr.numElements,WGL.FLOAT,false,/*шаг*/verticesBlockSize*4,it.offset*4)
       }
-      gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram3,"u_scale_matrix"),false,view.scaleMatrix)
+      gl.uniform1f(gl.getUniformLocation(shaderProgram3,"u_game_width"),view.gameWidth)
+      gl.uniform1f(gl.getUniformLocation(shaderProgram3,"u_game_height"),view.gameHeight)
       gl.uniform1i(gl.getUniformLocation(shaderProgram3,"u_test_array_size"),5)
 
       gl.enable(WGL.BLEND)
