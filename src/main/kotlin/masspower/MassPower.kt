@@ -62,7 +62,6 @@ uniform float u_game_height;
 //uniform vec2 u_game_camera_y;
 
 varying vec2 v_textCoord;
-varying vec4 arr[gl_MaxVaryingVectors-2];//28-29
 varying float v_divide;
 
 mat4 scale(float scale) {
@@ -71,12 +70,6 @@ mat4 scale(float scale) {
     vec4(0.0,   scale, 0.0,   0.0),
     vec4(0.0,   0.0,   scale, 0.0),
     vec4(0.0,   0.0,   0.0,   1.0)
-  );
-}
-mat2 scale2(float scale) {
-  return mat2(
-    vec2(scale, 0),
-    vec2(0, scale)
   );
 }
 void main(void) {
@@ -94,11 +87,7 @@ void main(void) {
       """
 precision mediump float;
 uniform sampler2D u_sampler;
-uniform lowp int u_test_array_size;//todo remove
-uniform lowp float u_arr[3];//todo remove
-uniform lowp vec4 u_vec_arr[gl_MaxVertexUniformVectors/2 - 5];
 varying vec2 v_textCoord;
-varying vec4 arr[gl_MaxVaryingVectors-2];//28-29
 varying float v_divide;
 void main(void) {
   gl_FragColor = texture2D(u_sampler, v_textCoord);
@@ -111,8 +100,6 @@ void main(void) {
       """
 precision mediump float;
 uniform sampler2D u_sampler;
-uniform lowp int u_test_array_size;
-uniform lowp vec4 u_vec_arr[gl_MaxVertexUniformVectors/2 - 5];
 void main(void) {
   gl_FragColor = vec4(0.3,0.3,0.3,0.4);
 }
@@ -151,8 +138,6 @@ void main(void) {
       gl.uniform1f(gl.getUniformLocation(shaderProgram,"u_game_width"),view.gameWidth)
       gl.uniform1f(gl.getUniformLocation(shaderProgram,"u_game_height"),view.gameHeight)
 //      gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram,"u_transform_matrix"),false,view.transformMatrix)
-      gl.uniform1i(gl.getUniformLocation(shaderProgram,"u_test_array_size"),5)
-      gl.uniform1fv(gl.getUniformLocation(shaderProgram,"u_arr[0]"),arrayOf(0.1f,0.1f))
 
       gl.useProgram(shaderProgram3)
       attributes.forEach {
@@ -161,7 +146,6 @@ void main(void) {
       }
       gl.uniform1f(gl.getUniformLocation(shaderProgram3,"u_game_width"),view.gameWidth)
       gl.uniform1f(gl.getUniformLocation(shaderProgram3,"u_game_height"),view.gameHeight)
-      gl.uniform1i(gl.getUniformLocation(shaderProgram3,"u_test_array_size"),5)
 
       gl.enable(WGL.BLEND)
       if(!DYNAMIC_BLEND) gl.blendFunc(defaultBlend.src.value,defaultBlend.dst.value)
