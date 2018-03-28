@@ -16,7 +16,6 @@ import org.khronos.webgl.WebGLRenderingContext as WGL
 const val DYNAMIC_SHADER = false//default true +1 fps
 const val DYNAMIC_BLEND = true//не влияет на производительность
 
-class TextureData(val vMatrix:Matrix4)
 data class ImgData(val url:String, val width:Int, val height:Int = width)
 class ImgCache(var texture:MassPower.GameTexture? = null)
 data class RenderData(val x:Float,val y:Float,val gameSize:Float,val imgData:ImgData)
@@ -25,7 +24,7 @@ abstract class View {
   abstract fun getHeight(aspectRation:Float):Float
   val gameWidth:Float get() = getWidth(window.innerWidth/window.innerHeight.toFloat())
   val gameHeight:Float get() = getHeight(window.innerWidth/window.innerHeight.toFloat())
-  val projectionMatrix get() = Matrix4().apply {setOrthographicProjection(0f,gameWidth,0f,gameHeight,-0.1f,-100f)}
+  val projectionMatrix get() = Matrix4().apply {setOrthographicProjection(0f,gameWidth,0f,gameHeight,-0.1f,-100f)}//todo gameScale
   val windowWidth get() = window.innerWidth.min(window.innerHeight*gameWidth/gameHeight)
   val windowHeight get() = window.innerHeight.min(window.innerWidth*gameHeight/gameWidth)
   val borderLeft get() = (window.innerWidth-windowWidth)/2
@@ -49,7 +48,7 @@ class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {
 attribute vec2 a_position;
 attribute vec2 a_boundingBox;
 attribute vec2 a_texCoord;
-attribute float a_scale;//todo сделать uniform для всех шейдеров
+attribute float a_scale;//todo сделать uniform для всех шейдеров gameScale
 attribute float a_divide;
 uniform mat4 u_projectionView;
 varying vec2 v_textCoord;
@@ -70,6 +69,12 @@ mat4 rotateZ(float angle) {
     vec4(-sin(angle),  cos(angle),  0.0,  0.0),
     vec4(0.0,          0.0,         1.0,  0.0),
     vec4(0.0,          0.0,         0.0,  1.0)
+  );
+}
+mat2 scale2(float scale) {
+  return mat2(
+    vec2(scale, 0),
+    vec2(0, scale)
   );
 }
 void main(void) {
@@ -140,7 +145,7 @@ void main(void) {
         if(false) gl.disableVertexAttribArray(it.location)//Если нужно после рендера отключить эти атрибуты (вероятно чтобы иметь возможность задать новые атрибуты для другого шейдера)
       }
       if(false) gl.uniform1i(gl.getUniformLocation(shaderProgram,"u_sampler"),0)
-      gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram,"u_projectionView"),false,(TextureData(view.projectionMatrix)).vMatrix.toFloat32Arr())
+      gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram,"u_projectionView"),false,view.projectionMatrix.toFloat32Arr())
       gl.uniform1i(gl.getUniformLocation(shaderProgram,"u_test_array_size"),5)
       gl.uniform1fv(gl.getUniformLocation(shaderProgram,"u_arr[0]"),arrayOf(0.1f,0.1f))
 
@@ -149,7 +154,7 @@ void main(void) {
         gl.enableVertexAttribArray(it.location)
         gl.vertexAttribPointer(it.location,it.attr.numElements,WGL.FLOAT,false,/*шаг*/verticesBlockSize*4,it.offset*4)
       }
-      gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram3,"u_projectionView"),false,(TextureData(view.projectionMatrix)).vMatrix.toFloat32Arr())
+      gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram3,"u_projectionView"),false,view.projectionMatrix.toFloat32Arr())
       gl.uniform1i(gl.getUniformLocation(shaderProgram3,"u_test_array_size"),5)
 
       gl.enable(WGL.BLEND)
@@ -229,7 +234,7 @@ void main(void) {
     val state = model?.calcDisplayState()
     gl.useProgram(shaderProgram3)
     if(true)state?.reactive?.forEach {
-      val scl = 5f//todo globalScale move to Uniform
+      val scl = gameScale
       val fan = CircleData(defaultBlend){cos, sin->
         val size=it.radius
         floatArrayOf(it.pos.x.toFloat(),it.pos.y.toFloat(),cos*size/2,sin*size/2,0f,0f,scl,1f)
