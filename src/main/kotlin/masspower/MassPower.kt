@@ -15,7 +15,6 @@ import org.khronos.webgl.WebGLRenderingContext as WGL
 
 const val DYNAMIC_SHADER = false//default true +1 fps
 const val DYNAMIC_TEXTURE = true//default true +2 fps
-const val BLEND = true//не влияет на производительность
 const val DYNAMIC_BLEND = true//не влияет на производительность
 const val IMG_SIZE_PX = 128//Важно для scale картинки
 
@@ -158,7 +157,7 @@ void main(void) {
       gl.uniform1i(gl.getUniformLocation(shaderProgram3,"u_test_array_size"),5)
 
       gl.enable(WGL.BLEND)
-      if(BLEND && !DYNAMIC_BLEND) gl.blendFunc(srcFactor,dstFactor)
+      if(!DYNAMIC_BLEND) gl.blendFunc(defaultBlend.src.value,defaultBlend.dst.value)
       gameLoop(it)
     }
 
@@ -204,10 +203,8 @@ void main(void) {
   var previousTime = time
   var fps30 = 30f
   var fps500 = 30f
-  var srcFactorGlow = WGL.SRC_ALPHA
-  var dstFactorGlow = if(false) WGL.DST_ALPHA else WGL.ONE_MINUS_SRC_ALPHA
-  var srcFactor:Int = WGL.SRC_ALPHA
-  var dstFactor = WGL.ONE_MINUS_SRC_ALPHA
+  val defaultBlend = Blend(BlendFactor.SRC_ALPHA, BlendFactor.ONE_MINUS_SRC_ALPHA)
+  val stripBlend = Blend(BlendFactor.SRC_ALPHA, if(true) BlendFactor.ONE_MINUS_SRC_ALPHA else BlendFactor.DST_ALPHA)
   val imgRed = ImgData("img/smiley_small_rect_red.png")
   val imgGreen = ImgData("img/smiley_small_rect_green.png")
   val imgBlue = ImgData("img/smiley_small_rect_blue.png")
@@ -235,7 +232,7 @@ void main(void) {
     gl.useProgram(shaderProgram3)
     if(true)state?.reactive?.forEach {
       val scl = 5f
-      val fan = CircleData(srcFactor, dstFactor){cos, sin->
+      val fan = CircleData(defaultBlend){cos, sin->
         val size=it.radius
         floatArrayOf(it.pos.x.toFloat(),it.pos.y.toFloat(),cos*size/2,sin*size/2,0f,0f,scl,0f,1f)
       }
@@ -277,10 +274,10 @@ void main(void) {
             it.x,it.y,right,top,1f,1f,it.scale,0f,1f,
             it.x,it.y,right,bottom,1f,0f,it.scale,0f,1f,
             it.x,it.y,left,bottom,0f,0f,it.scale,0f,1f)
-          val fan = CircleData(srcFactor, dstFactor) {cos,sin->
+          val fan = CircleData(defaultBlend) {cos,sin->
             floatArrayOf(it.x,it.y,cos*width/2,sin*height/2,cos*0.5f+0.5f,sin*0.5f+0.5f,it.scale,0f,1f)
           }
-          val strip = CircleData(srcFactor, dstFactor) {cos,sin->
+          val strip = CircleData(stripBlend) {cos,sin->
             val DIVIDE = 1.65f
             val glowRadius = 0.75f
             floatArrayOf(it.x,it.y,cos*width*glowRadius,sin*height*glowRadius,0.5f+cos*0.5f,0.5f+sin*0.5f,it.scale,0f,DIVIDE)
@@ -296,7 +293,19 @@ void main(void) {
   val cos10 = radian10.map {kotlin.math.cos(it)}.toFloatArray()
   val sin10 = radian10.map {kotlin.math.sin(it)}.toFloatArray()
 
-  class CircleData(val srcFactor:Int, val dstFactor:Int, val getArr:(cos:Float, sin:Float)->FloatArray)
+  class CircleData(val blend:Blend, val getArr:(cos:Float, sin:Float)->FloatArray)
+  data class Blend(val src:BlendFactor, val dst:BlendFactor)
+  enum class BlendFactor(val value:Int) {
+    SRC_COLOR(WGL.SRC_COLOR),
+    ONE_MINUS_SRC_COLOR(WGL.ONE_MINUS_SRC_COLOR),
+    DST_COLOR(WGL.DST_COLOR),
+    ONE_MINUS_DST_COLOR(WGL.ONE_MINUS_DST_COLOR),
+    SRC_ALPHA(WGL.SRC_ALPHA),
+    ONE_MINUS_SRC_ALPHA(WGL.ONE_MINUS_SRC_ALPHA),
+    DST_ALPHA(WGL.DST_ALPHA),
+    ONE_MINUS_DST_ALPHA(WGL.ONE_MINUS_DST_ALPHA),
+    SRC_ALPHA_SATURATE(WGL.SRC_ALPHA_SATURATE)
+  }
 
   fun renderCircle10(texture:WebGLTexture?, fan:CircleData, strip:CircleData? = null) {//noinline better performance
     val center = fan.getArr(0f,0f)
@@ -310,7 +319,7 @@ void main(void) {
     val f7 = fan.getArr(cos10[7], sin10[7])
     val f8 = fan.getArr(cos10[8], sin10[8])
     val f9 = fan.getArr(cos10[9], sin10[9])
-    if(BLEND && DYNAMIC_BLEND) gl.blendFunc(srcFactor,dstFactor)
+    if(DYNAMIC_BLEND) gl.blendFunc(fan.blend.src.value,fan.blend.dst.value)
     render(texture, Mode.TRIANGLE_FAN,*center,*f0,*f1,*f2,*f3,*f4,*f5,*f6,*f7,*f8,*f9,*f0)
     if(strip != null) {
       val s0 = strip.getArr(cos10[0], sin10[0])
@@ -323,7 +332,7 @@ void main(void) {
       val s7 = strip.getArr(cos10[7], sin10[7])
       val s8 = strip.getArr(cos10[8], sin10[8])
       val s9 = strip.getArr(cos10[9], sin10[9])
-      if(BLEND && DYNAMIC_BLEND) gl.blendFunc(srcFactorGlow,dstFactorGlow)
+      if(DYNAMIC_BLEND) gl.blendFunc(strip.blend.src.value,strip.blend.dst.value)
       render(texture, Mode.TRIANGLE_STRIP,*f0,*s0,*f1,*s1,*f2,*s2,*f3,*s3,*f4,*s4,*f5,*s5,*f6,*s6,*f7,*s7,*f8,*s8,*f9,*s9,*f0,*s0)
     }
   }
