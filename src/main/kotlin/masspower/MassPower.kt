@@ -45,17 +45,16 @@ class MassPower(val view:View = FixedWidth(1500f,1000f,1000f)) {
   val html = HTMLElements()
   val gl get() = html.webgl
   val vertex = gl.compileShader(/*language=GLSL*/"""
-attribute vec2 a_position;//игровые координаты
-//attribute float a_radius;
-//attribute float a_angle;
-//attribute float a_texture_width;
-//attribute float a_texture_height;
-
-attribute vec2 a_boundingBox;
+//Если атрибут в шейдере не используется, то при компиляции об будет вырезан, и могут возникнуть ошибки "enableVertexAttribArray: index out of range"\
 attribute vec2 a_texCoord;
+attribute vec2 a_position;//игровые координаты
+attribute vec2 a_boundingBox;
 attribute float a_scale;//todo сделать uniform для всех шейдеров gameScale
 attribute float a_divide;
 attribute float a_angle;
+attribute float a_radius;//радиус от 0 до 1 внутри круга и от 1 до ... вне круга//todo move first
+//attribute float a_texture_width;
+//attribute float a_texture_height;
 
 uniform float u_game_width;
 uniform float u_game_height;
@@ -74,8 +73,9 @@ mat4 scale(float scale) {
   );
 }
 void main(void) {
+  vec2 stub = a_texCoord;
   v_divide = a_divide;
-  v_textCoord = a_texCoord;
+  v_textCoord = vec2(0.5 + 0.5*cos(a_angle)*a_radius, 0.5 + 0.5*sin(a_angle)*a_radius);
   vec4 scaledBox = vec4(a_boundingBox, 1.0, 1.0) * scale(a_scale);// * rotateZ(a_rotation);
   mat2 gameScale = mat2(2.0/u_game_width, 0.0, 0.0, 2.0/u_game_height);
   gl_Position = vec4(gameScale*(a_position + scaledBox.xy), 1.0, 1.0) - vec4(1.0, 1.0, 0.0, 0.0);
@@ -105,7 +105,7 @@ void main(void) {
   gl_FragColor = vec4(0.3,0.3,0.3,0.4);
 }
 """,WGL.FRAGMENT_SHADER))
-  val attributes = listOf(Attr("a_position",2),Attr("a_boundingBox",2),Attr("a_texCoord",2),Attr("a_scale",1),Attr("a_divide",1), Attr("a_angle",1)).run {
+  val attributes = listOf(Attr("a_radius",1), Attr("a_position",2),Attr("a_boundingBox",2),Attr("a_texCoord",2),Attr("a_scale",1),Attr("a_divide",1), Attr("a_angle",1)).run {
     val result = mutableListOf<IterAttr>()
     var currentSize = 0
     forEach {
@@ -304,6 +304,8 @@ void main(void) {
 
   fun renderCircle10(texture:WebGLTexture?, fan:CircleData, strip:CircleData? = null) {//noinline better performance
     if(texture != null) gl.bindTexture(WGL.TEXTURE_2D,texture)//-2fps
+    val r1 = 1f//Радиус 1f - окружность
+    val r0 = 0f//центр круга
     val center = fan.getArr(0f,0f, 0f)
     val f0 = fan.getArr(cos10[0], sin10[0], radian10[0])
     val f1 = fan.getArr(cos10[1], sin10[1], radian10[1])
@@ -316,7 +318,7 @@ void main(void) {
     val f8 = fan.getArr(cos10[8], sin10[8], radian10[8])
     val f9 = fan.getArr(cos10[9], sin10[9], radian10[9])
     if(DYNAMIC_BLEND) gl.blendFunc(fan.blend.src.value,fan.blend.dst.value)
-    render(Mode.TRIANGLE_FAN,*center,*f0,*f1,*f2,*f3,*f4,*f5,*f6,*f7,*f8,*f9,*f0)
+    render(Mode.TRIANGLE_FAN,r0,*center,r1,*f0,r1,*f1,r1,*f2,r1,*f3,r1,*f4,r1,*f5,r1,*f6,r1,*f7,r1,*f8,r1,*f9,r1,*f0)
     if(strip != null) {
       val s0 = strip.getArr(cos10[0], sin10[0], radian10[0])
       val s1 = strip.getArr(cos10[1], sin10[1], radian10[1])
@@ -329,7 +331,8 @@ void main(void) {
       val s8 = strip.getArr(cos10[8], sin10[8], radian10[8])
       val s9 = strip.getArr(cos10[9], sin10[9], radian10[9])
       if(DYNAMIC_BLEND) gl.blendFunc(strip.blend.src.value,strip.blend.dst.value)
-      render(Mode.TRIANGLE_STRIP,*f0,*s0,*f1,*s1,*f2,*s2,*f3,*s3,*f4,*s4,*f5,*s5,*f6,*s6,*f7,*s7,*f8,*s8,*f9,*s9,*f0,*s0)
+      val sr = 1f//1.75f//за кругом glow radius
+      render(Mode.TRIANGLE_STRIP,r1,*f0,sr,*s0,r1,*f1,sr,*s1,r1,*f2,sr,*s2,r1,*f3,sr,*s3,r1,*f4,sr,*s4,r1,*f5,sr,*s5,r1,*f6,sr,*s6,r1,*f7,sr,*s7,r1,*f8,sr,*s8,r1,*f9,sr,*s9,r1,*f0,sr,*s0)
     }
   }
 
