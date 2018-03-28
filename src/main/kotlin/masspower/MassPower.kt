@@ -14,7 +14,6 @@ import kotlin.js.*
 import org.khronos.webgl.WebGLRenderingContext as WGL
 
 const val DYNAMIC_SHADER = false//default true +1 fps
-const val DYNAMIC_TEXTURE = true//default true +2 fps
 const val DYNAMIC_BLEND = true//не влияет на производительность
 
 class TextureData(val vMatrix:Matrix4)
@@ -259,21 +258,25 @@ void main(void) {
             gl.texParameteri(WGL.TEXTURE_2D,WGL.TEXTURE_MIN_FILTER,WGL.NEAREST)
             gl.texParameteri(WGL.TEXTURE_2D,WGL.TEXTURE_WRAP_T,WGL.CLAMP_TO_EDGE)
             gl.texParameteri(WGL.TEXTURE_2D,WGL.TEXTURE_WRAP_S,WGL.CLAMP_TO_EDGE)
-            if(DYNAMIC_TEXTURE) gl.bindTexture(WGL.TEXTURE_2D,null)//зануляем текстуру чтобы её настройки уже зафиксировать и случайно не изменить
+            gl.bindTexture(WGL.TEXTURE_2D,null)//зануляем текстуру чтобы её настройки уже зафиксировать и случайно не изменить
             this.texture = GameTexture(texture,img.width,img.height)
             null
           }
           img.src = it.imgData.url
         }
         cache.texture?.apply {
-          if(true) render(glTexture,Mode.TRIANGLE,
-            it.x,it.y,left,bottom,0f,0f,it.scale,1f,
-            it.x,it.y,left,top,0f,1f,it.scale,1f,
-            it.x,it.y,right,top,1f,1f,it.scale,1f,
+          if(true) {
+            gl.bindTexture(WGL.TEXTURE_2D,glTexture)//-2fps
+            render(Mode.TRIANGLE,
+              it.x,it.y,left,bottom,0f,0f,it.scale,1f,
+              it.x,it.y,left,top,0f,1f,it.scale,1f,
+              it.x,it.y,right,top,1f,1f,it.scale,1f,
 
-            it.x,it.y,right,top,1f,1f,it.scale,1f,
-            it.x,it.y,right,bottom,1f,0f,it.scale,1f,
-            it.x,it.y,left,bottom,0f,0f,it.scale,1f)
+              it.x,it.y,right,top,1f,1f,it.scale,1f,
+              it.x,it.y,right,bottom,1f,0f,it.scale,1f,
+              it.x,it.y,left,bottom,0f,0f,it.scale,1f)
+          }
+
           val fan = CircleData(defaultBlend) {cos,sin-> floatArrayOf(it.x,it.y,cos*width/2,sin*height/2,cos*0.5f+0.5f,sin*0.5f+0.5f,it.scale,1f)}
           val strip = CircleData(stripBlend) {cos,sin->
             val glowRadius = 0.75f
@@ -305,6 +308,7 @@ void main(void) {
   }
 
   fun renderCircle10(texture:WebGLTexture?, fan:CircleData, strip:CircleData? = null) {//noinline better performance
+    if(texture != null) gl.bindTexture(WGL.TEXTURE_2D,texture)//-2fps
     val center = fan.getArr(0f,0f)
     val f0 = fan.getArr(cos10[0], sin10[0])
     val f1 = fan.getArr(cos10[1], sin10[1])
@@ -317,7 +321,7 @@ void main(void) {
     val f8 = fan.getArr(cos10[8], sin10[8])
     val f9 = fan.getArr(cos10[9], sin10[9])
     if(DYNAMIC_BLEND) gl.blendFunc(fan.blend.src.value,fan.blend.dst.value)
-    render(texture, Mode.TRIANGLE_FAN,*center,*f0,*f1,*f2,*f3,*f4,*f5,*f6,*f7,*f8,*f9,*f0)
+    render(Mode.TRIANGLE_FAN,*center,*f0,*f1,*f2,*f3,*f4,*f5,*f6,*f7,*f8,*f9,*f0)
     if(strip != null) {
       val s0 = strip.getArr(cos10[0], sin10[0])
       val s1 = strip.getArr(cos10[1], sin10[1])
@@ -330,15 +334,15 @@ void main(void) {
       val s8 = strip.getArr(cos10[8], sin10[8])
       val s9 = strip.getArr(cos10[9], sin10[9])
       if(DYNAMIC_BLEND) gl.blendFunc(strip.blend.src.value,strip.blend.dst.value)
-      render(texture, Mode.TRIANGLE_STRIP,*f0,*s0,*f1,*s1,*f2,*s2,*f3,*s3,*f4,*s4,*f5,*s5,*f6,*s6,*f7,*s7,*f8,*s8,*f9,*s9,*f0,*s0)
+      render(Mode.TRIANGLE_STRIP,*f0,*s0,*f1,*s1,*f2,*s2,*f3,*s3,*f4,*s4,*f5,*s5,*f6,*s6,*f7,*s7,*f8,*s8,*f9,*s9,*f0,*s0)
     }
   }
 
-  inline fun render(texture:WebGLTexture?, mode:Mode,vararg allArgs:Float) = render(texture, mode,allArgs)
-  inline fun render(texture:WebGLTexture?, mode:Mode,allArgs:FloatArray) = render(mode,if(true) allArgs as Float32Array else Float32Array(allArgs.toTypedArray()),texture,allArgs.size)
+  inline fun render(mode:Mode,vararg allArgs:Float) = render(mode,allArgs)
+  inline fun render(mode:Mode,allArgs:FloatArray) = render(mode,if(true) allArgs as Float32Array else Float32Array(allArgs.toTypedArray()),allArgs.size)
   inline fun MutableList<Float>.vert(vararg args:Float) = addAll(args.toList())//todo check why asList doesn't working
-  inline fun render(texture:WebGLTexture?, mode:Mode,lambda:MutableList<Float>.()->Unit) = render(texture, mode,arrayListOf<Float>().also {it.lambda()}.toFloatArray())
-  inline fun render(mode:Mode,mesh:Float32Array,glTexture:WebGLTexture?,allFloatArgsCount:Int) {
+  inline fun render(mode:Mode,lambda:MutableList<Float>.()->Unit) = render(mode,arrayListOf<Float>().also {it.lambda()}.toFloatArray())
+  inline fun render(mode:Mode,mesh:Float32Array,allFloatArgsCount:Int) {
     lib.debug {
 //      lib.log.debug(glTexture.toString())
 //      lib.log.debug({glTexture}.toString())
@@ -346,7 +350,6 @@ void main(void) {
       if(allFloatArgsCount%verticesBlockSize!=0) lib.log.error("Number of vertices not a multiple of the attribute block size!")
     }
     if(true) gl.activeTexture(WGL.TEXTURE0)
-    if(glTexture != null) if(DYNAMIC_TEXTURE) gl.bindTexture(WGL.TEXTURE_2D,glTexture)
     gl.bufferData(WGL.ARRAY_BUFFER,mesh,WGL.DYNAMIC_DRAW)
     gl.drawArrays(mode.glMode,0,allFloatArgsCount/verticesBlockSize)//todo first, count
   }
