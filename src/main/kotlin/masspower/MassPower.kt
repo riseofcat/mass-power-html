@@ -16,14 +16,11 @@ import org.khronos.webgl.WebGLRenderingContext as WGL
 const val DYNAMIC_SHADER = false//default true +1 fps
 const val DYNAMIC_TEXTURE = true//default true +2 fps
 const val DYNAMIC_BLEND = true//не влияет на производительность
-const val IMG_SIZE_PX = 128//Важно для scale картинки
 
 class TextureData(val vMatrix:Matrix4)
-data class ImgData(val url:String)
+data class ImgData(val url:String, val width:Int, val height:Int = width)
 class ImgCache(var texture:MassPower.GameTexture? = null)
-data class RenderData(val x:Float,val y:Float,val gameSize:Float,val imgData:ImgData) {
-  val scale:Float get() = gameSize/IMG_SIZE_PX
-}
+data class RenderData(val x:Float,val y:Float,val gameSize:Float,val imgData:ImgData)
 abstract class View {
   abstract fun getWidth(aspectRation:Float):Float
   abstract fun getHeight(aspectRation:Float):Float
@@ -45,13 +42,15 @@ data class Attr(val locationName:String,val numElements:Int)
 data class IterAttr(val attr:Attr,val location:Int,val offset:Int)
 
 class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {
+  val gameScale:Float = 1.0f
+  val RenderData.scale:Float get() = gameScale * gameSize/imgData.width
   val html = HTMLElements()
   val gl get() = html.webgl
   val vertex = gl.compileShader(/*language=GLSL*/"""
 attribute vec2 a_position;
 attribute vec2 a_boundingBox;
 attribute vec2 a_texCoord;
-attribute float a_scale;
+attribute float a_scale;//todo сделать uniform для всех шейдеров
 attribute float a_rotation;
 attribute float a_divide;
 uniform mat4 u_projectionView;
@@ -127,7 +126,7 @@ void main(void) {
   var mousePos:XY = XY()
   val model:ClientModel? = ClientModel(Conf(5000))
 //  val model:ClientModel? = ClientModel(Conf(5000, "192.168.100.7"))
-//  val model = Model(Conf(80, "mass-power.herokuapp.com"))
+//  val model:ClientModel? = Model(Conf(80, "mass-power.herokuapp.com"))
 
   init {
     window.onfocus
@@ -205,12 +204,13 @@ void main(void) {
   var fps500 = 30f
   val defaultBlend = Blend(BlendFactor.SRC_ALPHA, BlendFactor.ONE_MINUS_SRC_ALPHA)
   val stripBlend = Blend(BlendFactor.SRC_ALPHA, if(true) BlendFactor.ONE_MINUS_SRC_ALPHA else BlendFactor.DST_ALPHA)
-  val imgRed = ImgData("img/smiley_small_rect_red.png")
-  val imgGreen = ImgData("img/smiley_small_rect_green.png")
-  val imgBlue = ImgData("img/smiley_small_rect_blue.png")
-  val imgYellow = ImgData("img/smiley_small_rect_yellow.png")
-  val imgViolet = ImgData("img/smiley_small_rect_violet.png")
-  val imgGray = ImgData("img/smiley_small_rect_gray.png")
+  val imgBig = ImgData("img/smiley.png",1024)
+  val imgRed = ImgData("img/smiley_small_rect_red.png",128)
+  val imgGreen = ImgData("img/smiley_small_rect_green.png",128)
+  val imgBlue = ImgData("img/smiley_small_rect_blue.png",128)
+  val imgYellow = ImgData("img/smiley_small_rect_yellow.png",128)
+  val imgViolet = ImgData("img/smiley_small_rect_violet.png",128)
+  val imgGray = ImgData("img/smiley_small_rect_gray.png",128)
   val colors = listOf(imgRed,imgGreen,imgBlue,imgYellow,imgViolet)
   val PlayerId.color get() = colors.let {it[id%it.size]}
 
@@ -222,6 +222,7 @@ void main(void) {
     html.canvas2d.clearRect(0.0,0.0,view.gameWidth.toDouble(),view.gameHeight.toDouble())
     html.canvas2d.fillStyle = "white"
     html.canvas2d.font = "bold 24pt Arial"
+    html.canvas2d.fillText("mouse: ${mousePos}",200.0,400.0)//todo протестировать производительность за пределами области рисования
     html.canvas2d.fillText("fps30: $fps30",200.0,450.0)
     html.canvas2d.fillText("fps500: $fps500",200.0,500.0)
     html.canvas2d.fillText(Gen.date(),200.0,550.0)
@@ -246,6 +247,7 @@ void main(void) {
         state.cars.forEach {add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),it.radius*2,it.owner.color))}
       }
       add(RenderData(mousePos.x.toFloat(),mousePos.y.toFloat(),30f,imgViolet))
+      add(RenderData(mousePos.x.toFloat(),mousePos.y.toFloat(),30f,imgBig))
     }.forEach {
         val cache = imgCache[it.imgData] ?: ImgCache().apply {
           imgCache[it.imgData] = this
@@ -343,6 +345,8 @@ void main(void) {
   inline fun render(texture:WebGLTexture?, mode:Mode,lambda:MutableList<Float>.()->Unit) = render(texture, mode,arrayListOf<Float>().also {it.lambda()}.toFloatArray())
   inline fun render(mode:Mode,mesh:Float32Array,glTexture:WebGLTexture?,allFloatArgsCount:Int) {
     lib.debug {
+//      lib.log.debug(glTexture.toString())
+//      lib.log.debug({glTexture}.toString())
       if(allFloatArgsCount<=0) lib.log.error("allFloatArgsCount<=0")
       if(allFloatArgsCount%verticesBlockSize!=0) lib.log.error("Number of vertices not a multiple of the attribute block size!")
     }
