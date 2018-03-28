@@ -51,7 +51,6 @@ attribute vec2 a_position;
 attribute vec2 a_boundingBox;
 attribute vec2 a_texCoord;
 attribute float a_scale;//todo сделать uniform для всех шейдеров
-attribute float a_rotation;
 attribute float a_divide;
 uniform mat4 u_projectionView;
 varying vec2 v_textCoord;
@@ -77,7 +76,7 @@ mat4 rotateZ(float angle) {
 void main(void) {
   v_divide = a_divide;
   v_textCoord = a_texCoord;
-  vec4 scaledBox = vec4(a_boundingBox, 1.0, 1.0) * scale(a_scale) * rotateZ(a_rotation);
+  vec4 scaledBox = vec4(a_boundingBox, 1.0, 1.0) * scale(a_scale);// * rotateZ(a_rotation);
   gl_Position = u_projectionView * vec4(a_position + scaledBox.xy, 1.0, 1.0);
   }
 """,WGL.VERTEX_SHADER)
@@ -88,8 +87,8 @@ void main(void) {
       """
 precision mediump float;
 uniform sampler2D u_sampler;
-uniform lowp int u_test_array_size;
-uniform lowp float u_arr[3];
+uniform lowp int u_test_array_size;//todo remove
+uniform lowp float u_arr[3];//todo remove
 uniform lowp vec4 u_vec_arr[gl_MaxVertexUniformVectors/2 - 5];
 varying vec2 v_textCoord;
 varying vec4 arr[gl_MaxVaryingVectors-2];//28-29
@@ -97,7 +96,6 @@ varying float v_divide;
 void main(void) {
   gl_FragColor = texture2D(u_sampler, v_textCoord);
   gl_FragColor.a = gl_FragColor.a / v_divide/v_divide/v_divide/v_divide/v_divide/v_divide;
-  //gl_FragColor.a = gl_FragColor.a * (u_arr[0] + u_arr[1]);
 }
 """,WGL.FRAGMENT_SHADER))
   val shaderProgram3:WebGLProgram = gl.createWebGLProgram(
@@ -112,7 +110,7 @@ void main(void) {
   gl_FragColor = vec4(0.3,0.3,0.3,0.4);
 }
 """,WGL.FRAGMENT_SHADER))
-  val attributes = listOf(Attr("a_position",2),Attr("a_boundingBox",2),Attr("a_texCoord",2),Attr("a_scale",1),Attr("a_rotation",1),Attr("a_divide",1)).run {
+  val attributes = listOf(Attr("a_position",2),Attr("a_boundingBox",2),Attr("a_texCoord",2),Attr("a_scale",1),Attr("a_divide",1)).run {
     val result = mutableListOf<IterAttr>()
     var currentSize = 0
     forEach {
@@ -232,15 +230,15 @@ void main(void) {
     val state = model?.calcDisplayState()
     gl.useProgram(shaderProgram3)
     if(true)state?.reactive?.forEach {
-      val scl = 5f
+      val scl = 5f//todo globalScale move to Uniform
       val fan = CircleData(defaultBlend){cos, sin->
         val size=it.radius
-        floatArrayOf(it.pos.x.toFloat(),it.pos.y.toFloat(),cos*size/2,sin*size/2,0f,0f,scl,0f,1f)
+        floatArrayOf(it.pos.x.toFloat(),it.pos.y.toFloat(),cos*size/2,sin*size/2,0f,0f,scl,1f)
       }
       renderCircle10(null,fan)
     }
     gl.useProgram(shaderProgram)
-    mutableListOf<RenderData>(/*RenderData(500f,500f,someWdthInGameCoords,imgGreen)*/).apply {
+    mutableListOf<RenderData>().apply {
       if(state != null) {
         state.foods.forEach {add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),it.radius*2,imgGray))}
         if(false) state.reactive.forEach {add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),it.radius*2,it.owner.color))}
@@ -269,20 +267,17 @@ void main(void) {
         }
         cache.texture?.apply {
           if(true) render(glTexture,Mode.TRIANGLE,
-            it.x,it.y,left,bottom,0f,0f,it.scale,0f,1f,
-            it.x,it.y,left,top,0f,1f,it.scale,0f,1f,
-            it.x,it.y,right,top,1f,1f,it.scale,0f,1f,
+            it.x,it.y,left,bottom,0f,0f,it.scale,1f,
+            it.x,it.y,left,top,0f,1f,it.scale,1f,
+            it.x,it.y,right,top,1f,1f,it.scale,1f,
 
-            it.x,it.y,right,top,1f,1f,it.scale,0f,1f,
-            it.x,it.y,right,bottom,1f,0f,it.scale,0f,1f,
-            it.x,it.y,left,bottom,0f,0f,it.scale,0f,1f)
-          val fan = CircleData(defaultBlend) {cos,sin->
-            floatArrayOf(it.x,it.y,cos*width/2,sin*height/2,cos*0.5f+0.5f,sin*0.5f+0.5f,it.scale,0f,1f)
-          }
+            it.x,it.y,right,top,1f,1f,it.scale,1f,
+            it.x,it.y,right,bottom,1f,0f,it.scale,1f,
+            it.x,it.y,left,bottom,0f,0f,it.scale,1f)
+          val fan = CircleData(defaultBlend) {cos,sin-> floatArrayOf(it.x,it.y,cos*width/2,sin*height/2,cos*0.5f+0.5f,sin*0.5f+0.5f,it.scale,1f)}
           val strip = CircleData(stripBlend) {cos,sin->
-            val DIVIDE = 1.65f
             val glowRadius = 0.75f
-            floatArrayOf(it.x,it.y,cos*width*glowRadius,sin*height*glowRadius,0.5f+cos*0.5f,0.5f+sin*0.5f,it.scale,0f,DIVIDE)
+            floatArrayOf(it.x,it.y,cos*width*glowRadius,sin*height*glowRadius,0.5f+cos*0.5f,0.5f+sin*0.5f,it.scale,/*divide*/1.65f)
           }
           renderCircle10(glTexture,fan,strip)
         }
