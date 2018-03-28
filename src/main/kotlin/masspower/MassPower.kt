@@ -24,7 +24,14 @@ abstract class View {
   abstract fun getHeight(aspectRation:Float):Float
   val gameWidth:Float get() = getWidth(window.innerWidth/window.innerHeight.toFloat())
   val gameHeight:Float get() = getHeight(window.innerWidth/window.innerHeight.toFloat())
-  val projectionMatrix get() = Matrix4().apply {setOrthographicProjection(0f,gameWidth,0f,gameHeight,-0.1f,-100f)}//todo gameScale
+  val scaleMatrix:Float32Array get() {
+    return floatArrayOf(
+      2.0f/gameWidth,0.0f,0.0f,0.0f,
+      0.0f,2.0f/gameHeight,0.0f,0.0f,
+      0.0f,0.0f,1.0f,0.0f,
+      0.0f,0.0f,0.0f,1.0f) as Float32Array
+  }
+
   val windowWidth get() = window.innerWidth.min(window.innerHeight*gameWidth/gameHeight)
   val windowHeight get() = window.innerHeight.min(window.innerWidth*gameHeight/gameWidth)
   val borderLeft get() = (window.innerWidth-windowWidth)/2
@@ -39,18 +46,30 @@ class FixedWidth(val width:Float,val minHeight:Float,val maxHeight:Float):View()
 data class Attr(val locationName:String,val numElements:Int)
 data class IterAttr(val attr:Attr,val location:Int,val offset:Int)
 
-class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {
+class MassPower(val view:View = FixedWidth(1500f,1000f,1000f)) {
   val gameScale:Float = 1.0f
   val RenderData.scale:Float get() = gameScale * gameSize/imgData.width
   val html = HTMLElements()
   val gl get() = html.webgl
   val vertex = gl.compileShader(/*language=GLSL*/"""
-attribute vec2 a_position;
+attribute vec2 a_position;//игровые координаты
+//attribute float a_radius;
+//attribute float a_angle;
+//attribute float a_texture_width;
+//attribute float a_texture_height;
+
 attribute vec2 a_boundingBox;
 attribute vec2 a_texCoord;
 attribute float a_scale;//todo сделать uniform для всех шейдеров gameScale
 attribute float a_divide;
-uniform mat4 u_projectionView;
+
+uniform mat4 u_scale_matrix;
+
+//uniform float u_game_width;
+//uniform float u_game_height;
+//uniform vec2 u_game_camera_x;
+//uniform vec2 u_game_camera_y;
+
 varying vec2 v_textCoord;
 varying vec4 arr[gl_MaxVaryingVectors-2];//28-29
 varying float v_divide;
@@ -63,14 +82,6 @@ mat4 scale(float scale) {
     vec4(0.0,   0.0,   0.0,   1.0)
   );
 }
-mat4 rotateZ(float angle) {
-  return mat4(
-    vec4(cos(angle),   sin(angle),  0.0,  0.0),
-    vec4(-sin(angle),  cos(angle),  0.0,  0.0),
-    vec4(0.0,          0.0,         1.0,  0.0),
-    vec4(0.0,          0.0,         0.0,  1.0)
-  );
-}
 mat2 scale2(float scale) {
   return mat2(
     vec2(scale, 0),
@@ -81,7 +92,8 @@ void main(void) {
   v_divide = a_divide;
   v_textCoord = a_texCoord;
   vec4 scaledBox = vec4(a_boundingBox, 1.0, 1.0) * scale(a_scale);// * rotateZ(a_rotation);
-  gl_Position = u_projectionView * vec4(a_position + scaledBox.xy, 1.0, 1.0);
+  mat4 resultTransform = u_scale_matrix;
+  gl_Position = u_scale_matrix * vec4(a_position + scaledBox.xy, 1.0, 1.0) - vec4(1.0, 1.0, 0.0, 0.0);
   }
 """,WGL.VERTEX_SHADER)
   val shaderProgram:WebGLProgram = gl.createWebGLProgram(/*language=GLSL*/
@@ -145,7 +157,8 @@ void main(void) {
         if(false) gl.disableVertexAttribArray(it.location)//Если нужно после рендера отключить эти атрибуты (вероятно чтобы иметь возможность задать новые атрибуты для другого шейдера)
       }
       if(false) gl.uniform1i(gl.getUniformLocation(shaderProgram,"u_sampler"),0)
-      gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram,"u_projectionView"),false,view.projectionMatrix.toFloat32Arr())
+      gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram,"u_scale_matrix"),false,view.scaleMatrix)
+//      gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram,"u_transform_matrix"),false,view.transformMatrix)
       gl.uniform1i(gl.getUniformLocation(shaderProgram,"u_test_array_size"),5)
       gl.uniform1fv(gl.getUniformLocation(shaderProgram,"u_arr[0]"),arrayOf(0.1f,0.1f))
 
@@ -154,7 +167,7 @@ void main(void) {
         gl.enableVertexAttribArray(it.location)
         gl.vertexAttribPointer(it.location,it.attr.numElements,WGL.FLOAT,false,/*шаг*/verticesBlockSize*4,it.offset*4)
       }
-      gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram3,"u_projectionView"),false,view.projectionMatrix.toFloat32Arr())
+      gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram3,"u_scale_matrix"),false,view.scaleMatrix)
       gl.uniform1i(gl.getUniformLocation(shaderProgram3,"u_test_array_size"),5)
 
       gl.enable(WGL.BLEND)
@@ -270,7 +283,7 @@ void main(void) {
           img.src = it.imgData.url
         }
         cache.texture?.apply {
-          if(true) {
+          if(false) {
             gl.bindTexture(WGL.TEXTURE_2D,glTexture)//-2fps
             render(Mode.TRIANGLE,
               it.x,it.y,left,bottom,0f,0f,it.scale,1f,
@@ -281,7 +294,6 @@ void main(void) {
               it.x,it.y,right,bottom,1f,0f,it.scale,1f,
               it.x,it.y,left,bottom,0f,0f,it.scale,1f)
           }
-
           val fan = CircleData(defaultBlend) {cos,sin-> floatArrayOf(it.x,it.y,cos*width/2,sin*height/2,cos*0.5f+0.5f,sin*0.5f+0.5f,it.scale,1f)}
           val strip = CircleData(stripBlend) {cos,sin->
             val glowRadius = 0.75f
