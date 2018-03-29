@@ -47,13 +47,12 @@ class MassPower(val view:View = FixedWidth(1500f,1000f,1000f)) {
   //language=GLSL
   val vertex = gl.compileShader(/*language=GLSL*/"""
 //Если атрибут в шейдере не используется, то при компиляции об будет вырезан, и могут возникнуть ошибки "enableVertexAttribArray: index out of range"
-attribute vec2 a_position;//игровые координаты
-//attribute vec2 a_boundingBox;
-attribute float a_scale;
+attribute vec2 a_position;//игровые координаты центра круга
+//attribute float a_scale;
 attribute float a_angle;
-attribute float a_game_radius;//радиус в игровых координатах//todo получается что всегда одинаковый. Тогда можно и в uniform положить.
+attribute float a_game_radius;//радиус в игровых координатах//todo получается что всегда одинаковый. Тогда можно и в uniform положить и проверить производительность
 
-attribute float a_radius;//радиус a_game_radius от [0 до 1] внутри круга и от (1 до inf) вне круга //todo позиция атрибутов, может lowp //todo можно сделать varying вместо v_textCoord и потестить performance
+attribute float a_relative_radius;//относительный радиус от [0 до 1] внутри круга и от (1 до inf) вне круга //todo позиция атрибутов, может lowp //todo можно сделать varying вместо v_textCoord и потестить performance
 
 uniform float u_game_width;
 uniform float u_game_height;
@@ -61,21 +60,13 @@ uniform float u_game_height;
 //uniform vec2 u_game_camera_y;
 
 varying vec2 v_textCoord;
-varying float v_distance;//расстояние до круга относительно a_radius. Если 0 то - в круге , если > 0 то точка на растоянии a_radius * v_distance от края круга
+varying float v_distance;//расстояние до круга относительно a_relative_radius. Если 0 то - в круге , если > 0 то точка на растоянии a_relative_radius * v_distance от края круга
 
-mat4 scale(float scale) {
-  return mat4(
-    vec4(scale, 0.0,   0.0,   0.0),
-    vec4(0.0,   scale, 0.0,   0.0),
-    vec4(0.0,   0.0,   scale, 0.0),
-    vec4(0.0,   0.0,   0.0,   1.0)
-  );
-}
 void main(void) {
-  v_distance = max(a_radius - 1.0, 0.0);
-  v_textCoord = vec2(0.5, 0.5) + vec2(cos(a_angle), sin(a_angle)) * 0.5 * min(a_radius, 1.0);
+  v_distance = max(a_relative_radius - 1.0, 0.0);
+  v_textCoord = vec2(0.5, 0.5) + vec2(cos(a_angle), sin(a_angle)) * 0.5 * min(a_relative_radius, 1.0);
   //vec4 scaledBox = vec4(a_boundingBox, 1.0, 1.0) * scale(a_scale);
-  vec4 scaledBox = vec4(cos(a_angle)*a_radius*a_game_radius, sin(a_angle)*a_radius*a_game_radius, 1.0, 1.0) * scale(a_scale);
+  vec4 scaledBox = vec4(cos(a_angle)*a_relative_radius*a_game_radius, sin(a_angle)*a_relative_radius*a_game_radius, 1.0, 1.0);// * scale(a_scale);
   mat2 gameScale = mat2(2.0/u_game_width, 0.0, 0.0, 2.0/u_game_height);
   gl_Position = vec4(gameScale*(a_position + scaledBox.xy), 1.0, 1.0) - vec4(1.0, 1.0, 0.0, 0.0);
   }
@@ -104,7 +95,7 @@ void main(void) {
   gl_FragColor = vec4(0.3,0.3,0.3,0.4);
 }
 """,WGL.FRAGMENT_SHADER))
-  val attributes = listOf(Attr("a_radius",1), Attr("a_position",2)/*,Attr("a_boundingBox",2)*/,Attr("a_scale",1), Attr("a_angle",1), Attr("a_game_radius",1)).run {
+  val attributes = listOf(Attr("a_relative_radius",1), Attr("a_position",2)/*,Attr("a_scale",1)*/, Attr("a_angle",1), Attr("a_game_radius",1)).run {
     val result = mutableListOf<IterAttr>()
     var currentSize = 0
     forEach {
@@ -224,9 +215,8 @@ void main(void) {
     val state = model?.calcDisplayState()
     gl.useProgram(shaderProgram3)
     if(true)state?.reactive?.forEach {
-      val scl = gameScale
       val fan = CircleData(defaultBlend){cos, sin, angle->
-        floatArrayOf(it.pos.x.toFloat(),it.pos.y.toFloat(),/*cos*size/2,sin*size/2,*/scl, angle, it.radius)
+        floatArrayOf(it.pos.x.toFloat(),it.pos.y.toFloat(),/*scl, */angle, it.radius)
       }
       renderCircle10(null,fan)
     }
@@ -270,9 +260,9 @@ void main(void) {
               it.x,it.y,right,bottom,1f,0f,it.scale,1f,
               it.x,it.y,left,bottom,0f,0f,it.scale,1f)
           }
-          val fan = CircleData(defaultBlend) {cos,sin, angle-> floatArrayOf(it.x,it.y,/*cos*width/2,sin*height/2,*/it.scale, angle, it.gameSize)}
+          val fan = CircleData(defaultBlend) {cos,sin, angle-> floatArrayOf(it.x,it.y,/*it.scale, */angle, it.gameSize)}
           val strip = CircleData(stripBlend) {cos,sin, angle->
-            floatArrayOf(it.x,it.y,/*cos*width*glowRadius,sin*height*glowRadius,*/it.scale, angle, it.gameSize)
+            floatArrayOf(it.x,it.y,/*it.scale, */angle, it.gameSize)
           }
           renderCircle10(glTexture,fan,strip, 0.75f)
         }
