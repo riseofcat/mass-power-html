@@ -51,7 +51,7 @@ attribute vec2 a_position;//игровые координаты
 //attribute vec2 a_boundingBox;
 attribute float a_scale;
 attribute float a_angle;
-attribute float a_game_radius;//радиус в игровых координатах//todo получается что всегда 
+attribute float a_game_radius;//радиус в игровых координатах//todo получается что всегда одинаковый. Тогда можно и в uniform положить.
 
 attribute float a_radius;//радиус a_game_radius от [0 до 1] внутри круга и от (1 до inf) вне круга //todo позиция атрибутов, может lowp //todo можно сделать varying вместо v_textCoord и потестить performance
 
