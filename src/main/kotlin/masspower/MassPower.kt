@@ -59,7 +59,7 @@ uniform float u_game_height;
 //uniform vec2 u_game_camera_y;
 
 varying vec2 v_textCoord;
-varying float v_divide;
+varying float v_distance;//расстояние до круга относительно a_radius. Если 0 то - в круге , если > 0 то точка на растоянии a_radius * v_distance от края круга
 
 mat4 scale(float scale) {
   return mat4(
@@ -70,7 +70,7 @@ mat4 scale(float scale) {
   );
 }
 void main(void) {
-  v_divide = 1.0 + max(a_radius - 1.0, 0.0);
+  v_distance = max(a_radius - 1.0, 0.0);
   v_textCoord = vec2(0.5, 0.5) + vec2(cos(a_angle), sin(a_angle)) * 0.5 * min(a_radius, 1.0);
   vec4 scaledBox = vec4(a_boundingBox, 1.0, 1.0) * scale(a_scale);// * rotateZ(a_rotation);
   mat2 gameScale = mat2(2.0/u_game_width, 0.0, 0.0, 2.0/u_game_height);
@@ -85,10 +85,10 @@ void main(void) {
 precision mediump float;
 uniform sampler2D u_sampler;
 varying vec2 v_textCoord;
-varying float v_divide;
+varying float v_distance;
 void main(void) {
   gl_FragColor = texture2D(u_sampler, v_textCoord);
-  gl_FragColor.a = gl_FragColor.a / v_divide/v_divide/v_divide/v_divide/v_divide/v_divide;
+  gl_FragColor.a = gl_FragColor.a / pow(1.0 + v_distance, 6.0);//todo потестировать performance pow() vs деление много раз
 }
 """,WGL.FRAGMENT_SHADER))
   val shaderProgram3:WebGLProgram = gl.createWebGLProgram(
