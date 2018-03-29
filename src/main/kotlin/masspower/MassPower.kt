@@ -64,7 +64,7 @@ varying float v_distance;//расстояние до круга относите
 void main(void) {
   v_distance = max(a_relative_radius - 1.0, 0.0);
   v_textCoord = vec2(0.5, 0.5) + vec2(cos(a_angle), sin(a_angle)) * 0.5 * min(a_relative_radius, 1.0);
-  vec4 scaledBox = vec4(cos(a_angle)*a_relative_radius*a_game_radius, sin(a_angle)*a_relative_radius*a_game_radius, 1.0, 1.0);// * scale(a_scale);
+  vec4 scaledBox = vec4(cos(a_angle)*a_relative_radius*a_game_radius, sin(a_angle)*a_relative_radius*a_game_radius, 1.0, 1.0);
   mat2 gameScale = mat2(2.0/u_game_width, 0.0, 0.0, 2.0/u_game_height);
   gl_Position = vec4(gameScale*(a_position + scaledBox.xy), 1.0, 1.0) - vec4(1.0, 1.0, 0.0, 0.0);
   }
