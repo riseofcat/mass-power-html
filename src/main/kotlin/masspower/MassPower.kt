@@ -48,7 +48,6 @@ class MassPower(val view:View = FixedWidth(1500f,1000f,1000f)) {
   val vertex = gl.compileShader(/*language=GLSL*/"""
 //Если атрибут в шейдере не используется, то при компиляции об будет вырезан, и могут возникнуть ошибки "enableVertexAttribArray: index out of range"
 attribute vec2 a_position;//игровые координаты центра круга
-//attribute float a_scale;
 attribute float a_angle;
 attribute float a_game_radius;//радиус в игровых координатах//todo получается что всегда одинаковый. Тогда можно и в uniform положить и проверить производительность
 
@@ -65,7 +64,6 @@ varying float v_distance;//расстояние до круга относите
 void main(void) {
   v_distance = max(a_relative_radius - 1.0, 0.0);
   v_textCoord = vec2(0.5, 0.5) + vec2(cos(a_angle), sin(a_angle)) * 0.5 * min(a_relative_radius, 1.0);
-  //vec4 scaledBox = vec4(a_boundingBox, 1.0, 1.0) * scale(a_scale);
   vec4 scaledBox = vec4(cos(a_angle)*a_relative_radius*a_game_radius, sin(a_angle)*a_relative_radius*a_game_radius, 1.0, 1.0);// * scale(a_scale);
   mat2 gameScale = mat2(2.0/u_game_width, 0.0, 0.0, 2.0/u_game_height);
   gl_Position = vec4(gameScale*(a_position + scaledBox.xy), 1.0, 1.0) - vec4(1.0, 1.0, 0.0, 0.0);
@@ -95,7 +93,7 @@ void main(void) {
   gl_FragColor = vec4(0.3,0.3,0.3,0.4);
 }
 """,WGL.FRAGMENT_SHADER))
-  val attributes = listOf(Attr("a_relative_radius",1), Attr("a_position",2)/*,Attr("a_scale",1)*/, Attr("a_angle",1), Attr("a_game_radius",1)).run {
+  val attributes = listOf(Attr("a_relative_radius",1), Attr("a_position",2), Attr("a_angle",1), Attr("a_game_radius",1)).run {
     val result = mutableListOf<IterAttr>()
     var currentSize = 0
     forEach {
@@ -329,8 +327,6 @@ void main(void) {
   inline fun render(mode:Mode,lambda:MutableList<Float>.()->Unit) = render(mode,arrayListOf<Float>().also {it.lambda()}.toFloatArray())
   inline fun render(mode:Mode,mesh:Float32Array,allFloatArgsCount:Int) {
     lib.debug {
-//      lib.log.debug(glTexture.toString())
-//      lib.log.debug({glTexture}.toString())
       if(allFloatArgsCount<=0) lib.log.error("allFloatArgsCount<=0")
       if(allFloatArgsCount%verticesBlockSize!=0) lib.log.error("Number of vertices not a multiple of the attribute block size!")
     }
