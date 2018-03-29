@@ -216,16 +216,16 @@ void main(void) {
     gl.useProgram(shaderProgram3)
     if(true)state?.reactive?.forEach {
       val fan = CircleData(defaultBlend){cos, sin, angle->
-        floatArrayOf(it.pos.x.toFloat(),it.pos.y.toFloat(),/*scl, */angle, it.radius)
+        floatArrayOf(it.pos.x.toFloat(),it.pos.y.toFloat(),angle,it.radius)
       }
       renderCircle10(null,fan)
     }
     gl.useProgram(shaderProgram)
     mutableListOf<RenderData>().apply {
       if(state != null) {
-        state.foods.forEach {add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),it.radius*2,imgGray))}
-        if(false) state.reactive.forEach {add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),it.radius*2,it.owner.color))}
-        state.cars.forEach {add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),it.radius*2,it.owner.color))}
+        state.foods.forEach {add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),it.radius,imgGray))}
+        if(false) state.reactive.forEach {add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),it.radius,it.owner.color))}
+        state.cars.forEach {add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),it.radius,it.owner.color))}
       }
       add(RenderData(mousePos.x.toFloat(),mousePos.y.toFloat(),30f,imgViolet))
       add(RenderData(mousePos.x.toFloat(),mousePos.y.toFloat(),30f,imgBig))
@@ -260,9 +260,9 @@ void main(void) {
               it.x,it.y,right,bottom,1f,0f,it.scale,1f,
               it.x,it.y,left,bottom,0f,0f,it.scale,1f)
           }
-          val fan = CircleData(defaultBlend) {cos,sin, angle-> floatArrayOf(it.x,it.y,/*it.scale, */angle, it.gameSize)}
+          val fan = CircleData(defaultBlend) {cos,sin, angle-> floatArrayOf(it.x,it.y,angle,it.gameSize)}
           val strip = CircleData(stripBlend) {cos,sin, angle->
-            floatArrayOf(it.x,it.y,/*it.scale, */angle, it.gameSize)
+            floatArrayOf(it.x,it.y,angle,it.gameSize)
           }
           renderCircle10(glTexture,fan,strip, 0.75f)
         }
