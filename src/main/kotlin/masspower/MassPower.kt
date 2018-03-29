@@ -46,14 +46,13 @@ class MassPower(val view:View = FixedWidth(1500f,1000f,1000f)) {
   val gl get() = html.webgl
   val vertex = gl.compileShader(/*language=GLSL*/"""
 //Если атрибут в шейдере не используется, то при компиляции об будет вырезан, и могут возникнуть ошибки "enableVertexAttribArray: index out of range"
-attribute float a_radius;//радиус от 0 до 1 внутри круга и от 1 до ... вне круга
 attribute vec2 a_position;//игровые координаты
 attribute vec2 a_boundingBox;
 attribute float a_scale;//todo сделать uniform для всех шейдеров gameScale
 attribute float a_divide;
 attribute float a_angle;
-//attribute float a_texture_width;
-//attribute float a_texture_height;
+
+attribute float a_radius;//радиус от [0 до 1] внутри круга и от (1 до inf) вне круга //todo позиция атрибутов, может lowp //todo можно сделать varying вместо v_textCoord и потестить performance
 
 uniform float u_game_width;
 uniform float u_game_height;
@@ -73,7 +72,7 @@ mat4 scale(float scale) {
 }
 void main(void) {
   v_divide = a_divide;
-  v_textCoord = vec2(0.5 + 0.5*cos(a_angle)*a_radius, 0.5 + 0.5*sin(a_angle)*a_radius);
+  v_textCoord = vec2(0.5, 0.5) + vec2(cos(a_angle), sin(a_angle)) * 0.5 * min(a_radius, 1.0);
   vec4 scaledBox = vec4(a_boundingBox, 1.0, 1.0) * scale(a_scale);// * rotateZ(a_rotation);
   mat2 gameScale = mat2(2.0/u_game_width, 0.0, 0.0, 2.0/u_game_height);
   gl_Position = vec4(gameScale*(a_position + scaledBox.xy), 1.0, 1.0) - vec4(1.0, 1.0, 0.0, 0.0);
@@ -329,7 +328,7 @@ void main(void) {
       val s8 = strip.getArr(cos10[8], sin10[8], radian10[8])
       val s9 = strip.getArr(cos10[9], sin10[9], radian10[9])
       if(DYNAMIC_BLEND) gl.blendFunc(strip.blend.src.value,strip.blend.dst.value)
-      val sr = 1f//1.75f//за кругом glow radius
+      val sr = 1.75f//за кругом glow radius
       render(Mode.TRIANGLE_STRIP,r1,*f0,sr,*s0,r1,*f1,sr,*s1,r1,*f2,sr,*s2,r1,*f3,sr,*s3,r1,*f4,sr,*s4,r1,*f5,sr,*s5,r1,*f6,sr,*s6,r1,*f7,sr,*s7,r1,*f8,sr,*s8,r1,*f9,sr,*s9,r1,*f0,sr,*s0)
     }
   }
