@@ -162,7 +162,7 @@ void main(void) {
     }
   }
 
-  inline val MouseEvent.xy get() = XY(getX(html.container), getY(html.container))
+  val MouseEvent.xy get() = XY(getX(html.container), getY(html.container))
 
   inner class GameTexture(val glTexture:WebGLTexture,val width:Int,val height:Int) {
     val left = -width/2f
@@ -270,19 +270,6 @@ void main(void) {
     window.requestAnimationFrame(::gameLoop)
   }
 
-  fun angle(i:Int,max:Int) = 2*kotlin.math.PI.toFloat()*i/max
-  val radian10 = (1..10).toList().map {angle(it,10)}/*.toFloatArray()*///todo test toFloatArray() performance
-  inline val rad0Of10 get() = radian10[0]//todo concrete value test performance
-  inline val rad1Of10 get() = radian10[1]
-  inline val rad2Of10 get() = radian10[2]
-  inline val rad3Of10 get() = radian10[3]
-  inline val rad4Of10 get() = radian10[4]
-  inline val rad5Of10 get() = radian10[5]
-  inline val rad6Of10 get() = radian10[6]
-  inline val rad7Of10 get() = radian10[7]
-  inline val rad8Of10 get() = radian10[8]
-  inline val rad9Of10 get() = radian10[9]
-
   class CircleData(val blend:Blend, val getArr:(angle:Float)->FloatArray)
   data class Blend(val src:BlendFactor, val dst:BlendFactor)
   enum class BlendFactor(val value:Int) {
@@ -297,6 +284,8 @@ void main(void) {
     SRC_ALPHA_SATURATE(WGL.SRC_ALPHA_SATURATE)
   }
 
+  fun angle(i:Int,max:Int) = 2*kotlin.math.PI.toFloat()*i/max
+  val radian10 = (0..9).toList().map {angle(it,10)}.toFloatArray()//todo попробовать закэшировать значения радиан в шейдерах (на лету генерить string шейдера) и передавать индексы
   fun renderCircle10(gameX:Float, gameY:Float, gameRadius:Float, texture:WebGLTexture?, fan:CircleData, strip:CircleData? = null, stripRelativeDistance:Float = 0.75f) {//noinline better performance
     if(texture != null) gl.bindTexture(WGL.TEXTURE_2D,texture)//-2fps
     val x = gameX
@@ -306,57 +295,56 @@ void main(void) {
     val r1 = 1f//Радиус 1f - окружность
     val r0 = 0f//центр круга
     val center = fan.getArr(0f)
-    //todo inline вместо обращения к массиву radian10[3]
-    val f0 = fan.getArr(rad0Of10)
-    val f1 = fan.getArr(rad1Of10)
-    val f2 = fan.getArr(rad2Of10)
-    val f3 = fan.getArr(rad3Of10)
-    val f4 = fan.getArr(rad4Of10)
-    val f5 = fan.getArr(rad5Of10)
-    val f6 = fan.getArr(rad6Of10)
-    val f7 = fan.getArr(rad7Of10)
-    val f8 = fan.getArr(rad8Of10)
-    val f9 = fan.getArr(rad9Of10)
+    val f0 = fan.getArr(radian10[0])
+    val f1 = fan.getArr(radian10[1])
+    val f2 = fan.getArr(radian10[2])
+    val f3 = fan.getArr(radian10[3])
+    val f4 = fan.getArr(radian10[4])
+    val f5 = fan.getArr(radian10[5])
+    val f6 = fan.getArr(radian10[6])
+    val f7 = fan.getArr(radian10[7])
+    val f8 = fan.getArr(radian10[8])
+    val f9 = fan.getArr(radian10[9])
     if(DYNAMIC_BLEND) gl.blendFunc(fan.blend.src.value,fan.blend.dst.value)
     render(Mode.TRIANGLE_FAN,
       x,y,notUsed,gr,r0,*center,
-      x,y,rad0Of10,gr,r1,*f0,
-      x,y,rad1Of10,gr,r1,*f1,
-      x,y,rad2Of10,gr,r1,*f2,
-      x,y,rad3Of10,gr,r1,*f3,
-      x,y,rad4Of10,gr,r1,*f4,
-      x,y,rad5Of10,gr,r1,*f5,
-      x,y,rad6Of10,gr,r1,*f6,
-      x,y,rad7Of10,gr,r1,*f7,
-      x,y,rad8Of10,gr,r1,*f8,
-      x,y,rad9Of10,gr,r1,*f9,
-      x,y,rad0Of10,gr,r1,*f0
+      x,y,radian10[0],gr,r1,*f0,
+      x,y,radian10[1],gr,r1,*f1,
+      x,y,radian10[2],gr,r1,*f2,
+      x,y,radian10[3],gr,r1,*f3,
+      x,y,radian10[4],gr,r1,*f4,
+      x,y,radian10[5],gr,r1,*f5,
+      x,y,radian10[6],gr,r1,*f6,
+      x,y,radian10[7],gr,r1,*f7,
+      x,y,radian10[8],gr,r1,*f8,
+      x,y,radian10[9],gr,r1,*f9,
+      x,y,radian10[0],gr,r1,*f0
     )
     if(strip != null) {
-      val s0 = strip.getArr(rad0Of10)
-      val s1 = strip.getArr(rad1Of10)
-      val s2 = strip.getArr(rad2Of10)
-      val s3 = strip.getArr(rad3Of10)
-      val s4 = strip.getArr(rad4Of10)
-      val s5 = strip.getArr(rad5Of10)
-      val s6 = strip.getArr(rad6Of10)
-      val s7 = strip.getArr(rad7Of10)
-      val s8 = strip.getArr(rad8Of10)
-      val s9 = strip.getArr(rad9Of10)
+      val s0 = strip.getArr(radian10[0])
+      val s1 = strip.getArr(radian10[1])
+      val s2 = strip.getArr(radian10[2])
+      val s3 = strip.getArr(radian10[3])
+      val s4 = strip.getArr(radian10[4])
+      val s5 = strip.getArr(radian10[5])
+      val s6 = strip.getArr(radian10[6])
+      val s7 = strip.getArr(radian10[7])
+      val s8 = strip.getArr(radian10[8])
+      val s9 = strip.getArr(radian10[9])
       if(DYNAMIC_BLEND) gl.blendFunc(strip.blend.src.value,strip.blend.dst.value)
       val rs = 1.0f + stripRelativeDistance//за кругом glow radius
       render(Mode.TRIANGLE_STRIP,
-        x,y,rad0Of10,gr,r1,*f0,x,y,rad0Of10,gr,rs,*s0,
-        x,y,rad1Of10,gr,r1,*f1,x,y,rad1Of10,gr,rs,*s1,
-        x,y,rad2Of10,gr,r1,*f2,x,y,rad2Of10,gr,rs,*s2,
-        x,y,rad3Of10,gr,r1,*f3,x,y,rad3Of10,gr,rs,*s3,
-        x,y,rad4Of10,gr,r1,*f4,x,y,rad4Of10,gr,rs,*s4,
-        x,y,rad5Of10,gr,r1,*f5,x,y,rad5Of10,gr,rs,*s5,
-        x,y,rad6Of10,gr,r1,*f6,x,y,rad6Of10,gr,rs,*s6,
-        x,y,rad7Of10,gr,r1,*f7,x,y,rad7Of10,gr,rs,*s7,
-        x,y,rad8Of10,gr,r1,*f8,x,y,rad8Of10,gr,rs,*s8,
-        x,y,rad9Of10,gr,r1,*f9,x,y,rad9Of10,gr,rs,*s9,
-        x,y,rad0Of10,gr,r1,*f0,x,y,rad0Of10,gr,rs,*s0
+        x,y,radian10[0],gr,r1,*f0,x,y,radian10[0],gr,rs,*s0,
+        x,y,radian10[1],gr,r1,*f1,x,y,radian10[1],gr,rs,*s1,
+        x,y,radian10[2],gr,r1,*f2,x,y,radian10[2],gr,rs,*s2,
+        x,y,radian10[3],gr,r1,*f3,x,y,radian10[3],gr,rs,*s3,
+        x,y,radian10[4],gr,r1,*f4,x,y,radian10[4],gr,rs,*s4,
+        x,y,radian10[5],gr,r1,*f5,x,y,radian10[5],gr,rs,*s5,
+        x,y,radian10[6],gr,r1,*f6,x,y,radian10[6],gr,rs,*s6,
+        x,y,radian10[7],gr,r1,*f7,x,y,radian10[7],gr,rs,*s7,
+        x,y,radian10[8],gr,r1,*f8,x,y,radian10[8],gr,rs,*s8,
+        x,y,radian10[9],gr,r1,*f9,x,y,radian10[9],gr,rs,*s9,
+        x,y,radian10[0],gr,r1,*f0,x,y,radian10[0],gr,rs,*s0
       )
     }
   }
