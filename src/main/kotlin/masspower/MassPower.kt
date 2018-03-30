@@ -48,7 +48,6 @@ class MassPower(val view:View = FixedWidth(1500f,1000f,1000f)) {
   val vertex = gl.compileShader(/*language=GLSL*/"""
 //Если атрибут в шейдере не используется, то при компиляции об будет вырезан, и могут возникнуть ошибки "enableVertexAttribArray: index out of range"
 attribute vec2 a_center_pos;//игровые координаты центра круга
-
 attribute float a_angle;
 attribute float a_game_radius;//Радиус объекта в игровых координатах. Всегда одинаковый для одного объекта.
 attribute float a_relative_radius;//относительный радиус от [0 до 1] внутри круга и от (1 до inf) вне круга //todo позиция атрибутов, может lowp
@@ -97,7 +96,7 @@ void main(void) {
   gl_FragColor = vec4(0.3,0.3,0.3,0.4);
 }
 """,WGL.FRAGMENT_SHADER))
-  val attributes = listOf(Attr("a_angle",1), Attr("a_game_radius",1), Attr("a_relative_radius",1), Attr("a_center_pos",2)).run {
+  val attributes = listOf(Attr("a_center_pos",2), Attr("a_angle",1), Attr("a_game_radius",1), Attr("a_relative_radius",1)).run {
     val result = mutableListOf<IterAttr>()
     var currentSize = 0
     forEach {
@@ -218,9 +217,9 @@ void main(void) {
     gl.useProgram(shaderProgram3)
     if(false)state?.reactive?.forEach {
       val fan = CircleData(defaultBlend){angle->
-        floatArrayOf(it.pos.x.toFloat(),it.pos.y.toFloat())
+        floatArrayOf(/*it.pos.x.toFloat(),it.pos.y.toFloat()*/)
       }
-      renderCircle10(it.radius, null,fan)
+      renderCircle10(it.pos.x.toFloat(), it.pos.y.toFloat(), it.radius, null,fan)
     }
     gl.useProgram(shaderProgram)
     mutableListOf<RenderData>().apply {
@@ -262,11 +261,11 @@ void main(void) {
               it.x,it.y,right,bottom,1f,0f,it.scale,1f,
               it.x,it.y,left,bottom,0f,0f,it.scale,1f)
           }
-          val fan = CircleData(defaultBlend) {angle-> floatArrayOf(it.x,it.y)}
+          val fan = CircleData(defaultBlend) {angle-> floatArrayOf(/*it.x,it.y*/)}
           val strip = CircleData(stripBlend) {angle->
-            floatArrayOf(it.x,it.y)
+            floatArrayOf(/*it.x,it.y*/)
           }
-          renderCircle10(it.gameSize, glTexture,fan,strip, 0.75f)
+          renderCircle10(it.x, it.y, it.gameSize, glTexture,fan,strip, 0.75f)
         }
       }
     window.requestAnimationFrame(::gameLoop)
@@ -289,9 +288,10 @@ void main(void) {
     SRC_ALPHA_SATURATE(WGL.SRC_ALPHA_SATURATE)
   }
 
-  fun renderCircle10(gameRadius:Float, texture:WebGLTexture?, fan:CircleData, strip:CircleData? = null, stripRelativeDistance:Float = 0.75f) {//noinline better performance
+  fun renderCircle10(gameX:Float, gameY:Float, gameRadius:Float, texture:WebGLTexture?, fan:CircleData, strip:CircleData? = null, stripRelativeDistance:Float = 0.75f) {//noinline better performance
     if(texture != null) gl.bindTexture(WGL.TEXTURE_2D,texture)//-2fps
-
+    val x = gameX
+    val y = gameY
     val notUsed = 0f
     val gr = gameRadius//так быстрее, чем через uniform (+2fps)
     val r1 = 1f//Радиус 1f - окружность
@@ -320,18 +320,18 @@ void main(void) {
     val f9 = fan.getArr(rad9Of10)
     if(DYNAMIC_BLEND) gl.blendFunc(fan.blend.src.value,fan.blend.dst.value)
     render(Mode.TRIANGLE_FAN,
-      notUsed, gr, r0,*center,
-      rad0Of10, gr, r1,*f0,
-      rad1Of10, gr, r1,*f1,
-      rad2Of10, gr, r1,*f2,
-      rad3Of10, gr, r1,*f3,
-      rad4Of10, gr, r1,*f4,
-      rad5Of10, gr, r1,*f5,
-      rad6Of10, gr, r1,*f6,
-      rad7Of10, gr, r1,*f7,
-      rad8Of10, gr, r1,*f8,
-      rad9Of10, gr, r1,*f9,
-      rad0Of10, gr, r1,*f0
+      x,y,notUsed,gr,r0,*center,
+      x,y,rad0Of10,gr,r1,*f0,
+      x,y,rad1Of10,gr,r1,*f1,
+      x,y,rad2Of10,gr,r1,*f2,
+      x,y,rad3Of10,gr,r1,*f3,
+      x,y,rad4Of10,gr,r1,*f4,
+      x,y,rad5Of10,gr,r1,*f5,
+      x,y,rad6Of10,gr,r1,*f6,
+      x,y,rad7Of10,gr,r1,*f7,
+      x,y,rad8Of10,gr,r1,*f8,
+      x,y,rad9Of10,gr,r1,*f9,
+      x,y,rad0Of10,gr,r1,*f0
     )
     if(strip != null) {
       val s0 = strip.getArr(radian10[0])
@@ -347,17 +347,17 @@ void main(void) {
       if(DYNAMIC_BLEND) gl.blendFunc(strip.blend.src.value,strip.blend.dst.value)
       val rs = 1.0f + stripRelativeDistance//за кругом glow radius
       render(Mode.TRIANGLE_STRIP,
-        rad0Of10,gr,r1,*f0,rad0Of10,gr,rs,*s0,
-        rad1Of10,gr,r1,*f1,rad1Of10,gr,rs,*s1,
-        rad2Of10,gr,r1,*f2,rad2Of10,gr,rs,*s2,
-        rad3Of10,gr,r1,*f3,rad3Of10,gr,rs,*s3,
-        rad4Of10,gr,r1,*f4,rad4Of10,gr,rs,*s4,
-        rad5Of10,gr,r1,*f5,rad5Of10,gr,rs,*s5,
-        rad6Of10,gr,r1,*f6,rad6Of10,gr,rs,*s6,
-        rad7Of10,gr,r1,*f7,rad7Of10,gr,rs,*s7,
-        rad8Of10,gr,r1,*f8,rad8Of10,gr,rs,*s8,
-        rad9Of10,gr,r1,*f9,rad9Of10,gr,rs,*s9,
-        rad0Of10,gr,r1,*f0,rad0Of10,gr,rs,*s0
+        x,y,rad0Of10,gr,r1,*f0,x,y,rad0Of10,gr,rs,*s0,
+        x,y,rad1Of10,gr,r1,*f1,x,y,rad1Of10,gr,rs,*s1,
+        x,y,rad2Of10,gr,r1,*f2,x,y,rad2Of10,gr,rs,*s2,
+        x,y,rad3Of10,gr,r1,*f3,x,y,rad3Of10,gr,rs,*s3,
+        x,y,rad4Of10,gr,r1,*f4,x,y,rad4Of10,gr,rs,*s4,
+        x,y,rad5Of10,gr,r1,*f5,x,y,rad5Of10,gr,rs,*s5,
+        x,y,rad6Of10,gr,r1,*f6,x,y,rad6Of10,gr,rs,*s6,
+        x,y,rad7Of10,gr,r1,*f7,x,y,rad7Of10,gr,rs,*s7,
+        x,y,rad8Of10,gr,r1,*f8,x,y,rad8Of10,gr,rs,*s8,
+        x,y,rad9Of10,gr,r1,*f9,x,y,rad9Of10,gr,rs,*s9,
+        x,y,rad0Of10,gr,r1,*f0,x,y,rad0Of10,gr,rs,*s0
       )
     }
   }
