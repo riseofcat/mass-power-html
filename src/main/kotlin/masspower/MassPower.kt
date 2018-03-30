@@ -15,7 +15,7 @@ import org.khronos.webgl.WebGLRenderingContext as WGL
 
 const val DYNAMIC_SHADER = false//default true +1 fps
 const val DYNAMIC_BLEND = true//не влияет на производительность
-//todo смёрджить в master
+
 data class ImgData(val url:String, val width:Int, val height:Int = width)
 class ImgCache(var texture:MassPower.GameTexture? = null)
 data class RenderData(val x:Float,val y:Float,val gameSize:Float,val imgData:ImgData)
