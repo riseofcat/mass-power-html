@@ -2,7 +2,6 @@ package kuden
 
 import com.riseofcat.lib.*
 import org.khronos.webgl.*
-import util.*
 
 class VertexShader<TVarying, TAttributes, IUniform>() {
 

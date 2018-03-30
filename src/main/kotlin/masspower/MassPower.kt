@@ -45,7 +45,7 @@ class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 widt
   val html = HTMLElements()
   val gl get() = html.webgl
   //language=GLSL
-  val vertex = gl.compileShader(/*language=GLSL*/"""
+  val vertex = /*language=GLSL*/"""
 //Если атрибут в шейдере не используется, то при компиляции он будет вырезан, и могут возникнуть ошибки "enableVertexAttribArray: index out of range"
 attribute vec2 a_center_pos;//игровые координаты центра круга //todo позиция атрибутов //попробовать lowp
 attribute float a_angle;
@@ -70,12 +70,11 @@ void main(void) {
   vec2 gamePos = a_center_pos + vec2(cos(a_angle)*currentRadius, sin(a_angle)*currentRadius);
   gl_Position = vec4(screenScale*gamePos, 1.0, 1.0) - vec4(1.0, 1.0, 0.0, 0.0);
   }
-""",WGL.VERTEX_SHADER)
+"""
   val shaderProgram:WebGLProgram = gl.createWebGLProgram(/*language=GLSL*/
     vertex,
-    gl.compileShader(
-      /*language=GLSL*/
-      """
+/*language=GLSL*/
+"""
 precision mediump float;
 uniform sampler2D u_sampler;
 varying vec2 v_textCoord;
@@ -84,17 +83,16 @@ void main(void) {
   gl_FragColor = texture2D(u_sampler, v_textCoord);
   gl_FragColor.a = gl_FragColor.a / pow(1.0 + v_distance, 6.0);//todo потестировать performance pow() vs деление много раз
 }
-""",WGL.FRAGMENT_SHADER))
+""")
   val shaderProgram3:WebGLProgram = gl.createWebGLProgram(
     vertex,
-    gl.compileShader(/*language=GLSL*/
-      """
+"""
 precision mediump float;
 uniform sampler2D u_sampler;
 void main(void) {
   gl_FragColor = vec4(0.3,0.3,0.3,0.4);
 }
-""",WGL.FRAGMENT_SHADER))
+""")
   val attributes = listOf(Attr("a_center_pos",2), Attr("a_angle",1), Attr("a_game_radius",1), Attr("a_relative_radius",1)).run {
     val result = mutableListOf<IterAttr>()
     var currentSize = 0
@@ -104,7 +102,24 @@ void main(void) {
     }
     result
   }
-  val verticesBlockSize = attributes.sumBy {it.attr.numElements}
+  val backgroundShader:WebGLProgram = gl.createWebGLProgram(shader_mesh_default_vert,shader_background_stars_frag)
+  var currentShader:WebGLProgram = backgroundShader//todo bad currentShader
+  val backgroundAttributes = listOf(Attr("aVertexPosition",2)).run {
+    val result = mutableListOf<IterAttr>()
+    var currentSize = 0
+    forEach {
+      result.add(IterAttr(it,gl.getAttribLocation(backgroundShader,it.locationName),currentSize))
+      currentSize += it.numElements
+    }
+    result
+  }
+
+  val verticesBlockSize = mapOf(
+    shaderProgram to attributes.sumBy {it.attr.numElements},
+    shaderProgram3 to attributes.sumBy {it.attr.numElements},
+    backgroundShader to backgroundAttributes.sumBy {it.attr.numElements}
+  )
+
   private val imgCache:MutableMap<ImgData,ImgCache> = hashMapOf()
   var mousePos:XY = XY()
   val model:ClientModel? = ClientModel(Conf(5000))
@@ -119,10 +134,18 @@ void main(void) {
     window.requestAnimationFrame {
       gl.bindBuffer(WGL.ARRAY_BUFFER,gl.createBuffer() ?: lib.log.fatalError("Unable to create webgl buffer!"))
 
+      gl.useProgram(backgroundShader)
+      currentShader = backgroundShader
+      backgroundAttributes.forEach {
+        gl.enableVertexAttribArray(it.location)
+        gl.vertexAttribPointer(it.location,it.attr.numElements,WGL.FLOAT,false,/*шаг*/verticesBlockSize[backgroundShader]!!*4,it.offset*4)
+      }
+
       gl.useProgram(shaderProgram)
+      currentShader = shaderProgram
       attributes.forEach {
         gl.enableVertexAttribArray(it.location)
-        gl.vertexAttribPointer(it.location,it.attr.numElements,WGL.FLOAT,false,/*шаг*/verticesBlockSize*4,it.offset*4)//todo попробовать разные типы а также lowp precision
+        gl.vertexAttribPointer(it.location,it.attr.numElements,WGL.FLOAT,false,/*шаг*/verticesBlockSize[shaderProgram]!!*4,it.offset*4)//todo попробовать разные типы а также lowp precision
         if(false) gl.disableVertexAttribArray(it.location)//Если нужно после рендера отключить эти атрибуты (вероятно чтобы иметь возможность задать новые атрибуты для другого шейдера)
       }
       if(false) gl.uniform1i(gl.getUniformLocation(shaderProgram,"u_sampler"),0)
@@ -131,9 +154,10 @@ void main(void) {
 //      gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram,"u_transform_matrix"),false,view.transformMatrix)
 
       gl.useProgram(shaderProgram3)
+      currentShader = shaderProgram3
       attributes.forEach {
         gl.enableVertexAttribArray(it.location)
-        gl.vertexAttribPointer(it.location,it.attr.numElements,WGL.FLOAT,false,/*шаг*/verticesBlockSize*4,it.offset*4)
+        gl.vertexAttribPointer(it.location,it.attr.numElements,WGL.FLOAT,false,/*шаг*/verticesBlockSize[shaderProgram3]!!*4,it.offset*4)
       }
       gl.uniform1f(gl.getUniformLocation(shaderProgram3,"u_game_width"),view.gameWidth)
       gl.uniform1f(gl.getUniformLocation(shaderProgram3,"u_game_height"),view.gameHeight)
@@ -213,7 +237,25 @@ void main(void) {
     gl.clearColor(0f,0f,0f,1f)
     gl.clear(WGL.COLOR_BUFFER_BIT)
     val state = model?.calcDisplayState()
+
+    gl.useProgram(backgroundShader)
+    currentShader = backgroundShader
+//      gl.uniform1f(gl.getUniformLocation(backgroundShader,"resolution"),width,height)
+    gl.uniform1f(gl.getUniformLocation(backgroundShader,"time"),lib.pillarTimeS(10_000f).toFloat())
+//      gl.uniform1f(gl.getUniformLocation(backgroundShader,"mouse"),backgroundOffset.xf,backgroundOffset.yf)
+//    render(Mode.TRIANGLE, -1.0f,1.0f,  -1.0f,-1.0f,  1.0f,-1.0f)//todo
+//      ,1.0f,-1.0f,   1.0f,1.0f,   -1.0f,1.0f)
+
     gl.useProgram(shaderProgram3)
+    currentShader = shaderProgram3
+
+    if(true) {
+      render(Mode.TRIANGLE,
+        100f,100f,0f,200f,1f,
+        100f,100f,1f,200f,1f,
+        100f,100f,2f,200f,1f)
+    }
+
     if(true)state?.reactive?.forEach {
       val fan = CircleData(defaultBlend){angle->
         floatArrayOf(/*it.pos.x.toFloat(),it.pos.y.toFloat()*/)
@@ -221,6 +263,7 @@ void main(void) {
       renderCircle10(it.pos.x.toFloat(), it.pos.y.toFloat(), it.radius*1.3f, null,fan)
     }
     gl.useProgram(shaderProgram)
+    currentShader = shaderProgram
     mutableListOf<RenderData>().apply {
       if(state != null) {
         state.foods.forEach {add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),it.radius,imgGray))}
@@ -249,16 +292,12 @@ void main(void) {
           img.src = it.imgData.url
         }
         cache.texture?.apply {
-          if(false) {//todo удалить как добавлю задник
+          if(true) {//todo удалить как добавлю задник
             gl.bindTexture(WGL.TEXTURE_2D,glTexture)//-2fps
             render(Mode.TRIANGLE,
-              it.x,it.y,left,bottom,0f,0f,it.scale,1f,
-              it.x,it.y,left,top,0f,1f,it.scale,1f,
-              it.x,it.y,right,top,1f,1f,it.scale,1f,
-
-              it.x,it.y,right,top,1f,1f,it.scale,1f,
-              it.x,it.y,right,bottom,1f,0f,it.scale,1f,
-              it.x,it.y,left,bottom,0f,0f,it.scale,1f)
+              it.x,it.y,0f,it.gameSize*2,1f,
+              it.x,it.y,1f,it.gameSize*2,1f,
+              it.x,it.y,2f,it.gameSize*2,1f)
           }
           val fan = CircleData(defaultBlend) {angle-> floatArrayOf(/*it.x,it.y*/)}
           val strip = CircleData(stripBlend) {angle->
@@ -355,12 +394,12 @@ void main(void) {
   inline fun render(mode:Mode,lambda:MutableList<Float>.()->Unit) = render(mode,arrayListOf<Float>().also {it.lambda()}.toFloatArray())
   inline fun render(mode:Mode,mesh:Float32Array,allFloatArgsCount:Int) {
     lib.debug {
-      if(allFloatArgsCount<=0) lib.log.error("allFloatArgsCount<=0")
-      if(allFloatArgsCount%verticesBlockSize!=0) lib.log.error("Number of vertices not a multiple of the attribute block size!")
+      if(allFloatArgsCount<=0) lib.log.errorr("allFloatArgsCount<=0")
+      if(allFloatArgsCount%verticesBlockSize[currentShader]!! !=0) lib.log.errorr("Number of vertices not a multiple of the attribute block size! allFloatArgsCount: $allFloatArgsCount,  verticesBlockSize: ${verticesBlockSize[currentShader]!!}")
     }
     if(true) gl.activeTexture(WGL.TEXTURE0)
     gl.bufferData(WGL.ARRAY_BUFFER,mesh,WGL.DYNAMIC_DRAW)
-    gl.drawArrays(mode.glMode,0,allFloatArgsCount/verticesBlockSize)//todo first, count
+    gl.drawArrays(mode.glMode,0,allFloatArgsCount/verticesBlockSize[currentShader]!!)//todo first, count
   }
 }
 
