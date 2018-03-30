@@ -85,7 +85,32 @@ void main(void) {
 }
 """)
   val shaderProgram3:WebGLProgram = gl.createWebGLProgram(
-    vertex,
+/*language=GLSL*/"""
+//Если атрибут в шейдере не используется, то при компиляции он будет вырезан, и могут возникнуть ошибки "enableVertexAttribArray: index out of range"
+attribute vec2 a_center_pos;//игровые координаты центра круга //todo позиция атрибутов //попробовать lowp
+attribute float a_angle;
+attribute float a_game_radius;//Радиус объекта в игровых координатах. Всегда одинаковый для одного объекта.//так быстрее (+2fps), чем через uniform float u_game_radius;
+attribute float a_relative_radius;//относительный радиус от [0 до 1] внутри круга и от (1 до inf) вне круга
+
+uniform float u_game_width;
+uniform float u_game_height;
+//uniform vec2 u_game_camera_x;
+//uniform vec2 u_game_camera_y;
+
+varying vec2 v_textCoord;
+varying float v_distance;//расстояние до круга относительно a_relative_radius. Если 0 то - в круге , если > 0 то точка на растоянии a_relative_radius * v_distance от края круга
+
+void main(void) {
+  v_distance = max(a_relative_radius - 1.0, 0.0);//todo попробовать не квадратную, а прямоугольную текстуру
+  //сейчас из png вырезается элипс, а ещё можно попробовать натягивать прямоугольник, чтобы попадали уголки png
+  v_textCoord = vec2(0.5, 0.5) + vec2(cos(a_angle), sin(a_angle)) * 0.5 * min(a_relative_radius, 1.0);
+  float currentRadius = a_relative_radius*a_game_radius;
+  mat2 screenScale = mat2(2.0/u_game_width,       0.0,
+                                0.0,       2.0/u_game_height);
+  vec2 gamePos = a_center_pos + vec2(cos(a_angle)*currentRadius, sin(a_angle)*currentRadius);
+  gl_Position = vec4(screenScale*gamePos, 1.0, 1.0) - vec4(1.0, 1.0, 0.0, 0.0);
+  }
+""",
 """
 precision mediump float;
 uniform sampler2D u_sampler;
@@ -94,6 +119,15 @@ void main(void) {
 }
 """)
   val attributes = listOf(Attr("a_center_pos",2), Attr("a_angle",1), Attr("a_game_radius",1), Attr("a_relative_radius",1)).run {
+    val result = mutableListOf<IterAttr>()
+    var currentSize = 0
+    forEach {
+      result.add(IterAttr(it,gl.getAttribLocation(shaderProgram,it.locationName),currentSize))
+      currentSize += it.numElements
+    }
+    result
+  }
+  val attributes3 = listOf(Attr("a_center_pos",2), Attr("a_angle",1), Attr("a_game_radius",1), Attr("a_relative_radius",1)).run {
     val result = mutableListOf<IterAttr>()
     var currentSize = 0
     forEach {
@@ -116,7 +150,7 @@ void main(void) {
 
   val verticesBlockSize = mapOf(
     shaderProgram to attributes.sumBy {it.attr.numElements},
-    shaderProgram3 to attributes.sumBy {it.attr.numElements},
+    shaderProgram3 to attributes3.sumBy {it.attr.numElements},
     backgroundShader to backgroundAttributes.sumBy {it.attr.numElements}
   )
 
@@ -155,7 +189,7 @@ void main(void) {
 
       gl.useProgram(shaderProgram3)
       currentShader = shaderProgram3
-      attributes.forEach {
+      attributes3.forEach {
         gl.enableVertexAttribArray(it.location)
         gl.vertexAttribPointer(it.location,it.attr.numElements,WGL.FLOAT,false,/*шаг*/verticesBlockSize[shaderProgram3]!!*4,it.offset*4)
       }
