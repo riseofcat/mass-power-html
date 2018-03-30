@@ -47,12 +47,13 @@ class MassPower(val view:View = FixedWidth(1500f,1000f,1000f)) {
   //language=GLSL
   val vertex = gl.compileShader(/*language=GLSL*/"""
 //Если атрибут в шейдере не используется, то при компиляции об будет вырезан, и могут возникнуть ошибки "enableVertexAttribArray: index out of range"
-attribute vec2 a_position;//игровые координаты центра круга
+attribute vec2 a_center_pos;//игровые координаты центра круга
 attribute float a_angle;
-attribute float a_game_radius;//радиус в игровых координатах//todo получается что всегда одинаковый. Тогда можно и в uniform положить и проверить производительность
+//attribute float a_game_radius;//радиус в игровых координатах//todo получается что всегда одинаковый. Тогда можно и в uniform положить и проверить производительность
 
 attribute float a_relative_radius;//относительный радиус от [0 до 1] внутри круга и от (1 до inf) вне круга //todo позиция атрибутов, может lowp //todo можно сделать varying вместо v_textCoord и потестить performance
 
+uniform float u_game_radius;//todo test performance
 uniform float u_game_width;
 uniform float u_game_height;
 //uniform vec2 u_game_camera_x;
@@ -64,9 +65,11 @@ varying float v_distance;//расстояние до круга относите
 void main(void) {
   v_distance = max(a_relative_radius - 1.0, 0.0);
   v_textCoord = vec2(0.5, 0.5) + vec2(cos(a_angle), sin(a_angle)) * 0.5 * min(a_relative_radius, 1.0);
-  vec4 scaledBox = vec4(cos(a_angle)*a_relative_radius*a_game_radius, sin(a_angle)*a_relative_radius*a_game_radius, 1.0, 1.0);
-  mat2 gameScale = mat2(2.0/u_game_width, 0.0, 0.0, 2.0/u_game_height);
-  gl_Position = vec4(gameScale*(a_position + scaledBox.xy), 1.0, 1.0) - vec4(1.0, 1.0, 0.0, 0.0);
+  float currentRadius = a_relative_radius*u_game_radius;
+  mat2 screenScale = mat2(2.0/u_game_width,       0.0,
+                                0.0,       2.0/u_game_height);
+  vec2 gamePos = a_center_pos + vec2(cos(a_angle)*currentRadius, sin(a_angle)*currentRadius);
+  gl_Position = vec4(screenScale*gamePos, 1.0, 1.0) - vec4(1.0, 1.0, 0.0, 0.0);
   }
 """,WGL.VERTEX_SHADER)
   val shaderProgram:WebGLProgram = gl.createWebGLProgram(/*language=GLSL*/
@@ -93,7 +96,7 @@ void main(void) {
   gl_FragColor = vec4(0.3,0.3,0.3,0.4);
 }
 """,WGL.FRAGMENT_SHADER))
-  val attributes = listOf(Attr("a_relative_radius",1), Attr("a_position",2), Attr("a_angle",1), Attr("a_game_radius",1)).run {
+  val attributes = listOf(Attr("a_relative_radius",1), Attr("a_center_pos",2), Attr("a_angle",1)/*, Attr("a_game_radius",1)*/).run {
     val result = mutableListOf<IterAttr>()
     var currentSize = 0
     forEach {
@@ -194,6 +197,7 @@ void main(void) {
   val imgGray = ImgData("img/smiley_small_rect_gray.png",128)
   val colors = listOf(imgRed,imgGreen,imgBlue,imgYellow,imgViolet)
   val PlayerId.color get() = colors.let {it[id%it.size]}
+  var currentShader:WebGLProgram = shaderProgram//todo bad
 
   private fun gameLoop(милисекундСоСтараПлюсБездействие:Double):Unit = lib.saveInvoke {
     fps30 = (fps30*30+1f/(time-previousTime)).toFloat()/(30+1)
@@ -212,17 +216,19 @@ void main(void) {
     gl.clear(WGL.COLOR_BUFFER_BIT)
     val state = model?.calcDisplayState()
     gl.useProgram(shaderProgram3)
-    if(true)state?.reactive?.forEach {
+    currentShader = shaderProgram3
+    if(false)state?.reactive?.forEach {
       val fan = CircleData(defaultBlend){cos, sin, angle->
-        floatArrayOf(it.pos.x.toFloat(),it.pos.y.toFloat(),angle,it.radius)
+        floatArrayOf(it.pos.x.toFloat(),it.pos.y.toFloat(),angle/*,it.radius*/)
       }
-      renderCircle10(null,fan)
+      renderCircle10(it.radius, null,fan)
     }
     gl.useProgram(shaderProgram)
+    currentShader = shaderProgram
     mutableListOf<RenderData>().apply {
       if(state != null) {
         state.foods.forEach {add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),it.radius,imgGray))}
-        if(false) state.reactive.forEach {add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),it.radius,it.owner.color))}
+        if(true) state.reactive.forEach {add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),it.radius,it.owner.color))}
         state.cars.forEach {add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),it.radius,it.owner.color))}
       }
       add(RenderData(mousePos.x.toFloat(),mousePos.y.toFloat(),30f,imgViolet))
@@ -258,11 +264,11 @@ void main(void) {
               it.x,it.y,right,bottom,1f,0f,it.scale,1f,
               it.x,it.y,left,bottom,0f,0f,it.scale,1f)
           }
-          val fan = CircleData(defaultBlend) {cos,sin, angle-> floatArrayOf(it.x,it.y,angle,it.gameSize)}
+          val fan = CircleData(defaultBlend) {cos,sin, angle-> floatArrayOf(it.x,it.y,angle/*,it.gameSize*/)}
           val strip = CircleData(stripBlend) {cos,sin, angle->
-            floatArrayOf(it.x,it.y,angle,it.gameSize)
+            floatArrayOf(it.x,it.y,angle/*,it.gameSize*/)
           }
-          renderCircle10(glTexture,fan,strip, 0.75f)
+          renderCircle10(it.gameSize, glTexture,fan,strip, 0.75f)
         }
       }
     window.requestAnimationFrame(::gameLoop)
@@ -287,8 +293,10 @@ void main(void) {
     SRC_ALPHA_SATURATE(WGL.SRC_ALPHA_SATURATE)
   }
 
-  fun renderCircle10(texture:WebGLTexture?, fan:CircleData, strip:CircleData? = null, stripRelativeDistance:Float = 0.75f) {//noinline better performance
+  fun renderCircle10(radius:Float, texture:WebGLTexture?, fan:CircleData, strip:CircleData? = null, stripRelativeDistance:Float = 0.75f) {//noinline better performance
     if(texture != null) gl.bindTexture(WGL.TEXTURE_2D,texture)//-2fps
+    gl.uniform1f(gl.getUniformLocation(currentShader,"u_game_radius"),radius)//todo cache position? //todo если будут проблемы с проивзодительностью, то можно применять uniform для группы объектов с одинаковыми радиусами
+
     val r1 = 1f//Радиус 1f - окружность
     val r0 = 0f//центр круга
     val center = fan.getArr(0f,0f, 0f)
