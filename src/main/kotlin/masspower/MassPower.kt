@@ -273,7 +273,7 @@ void main(void) {
   }
 
   fun angle(i:Int,max:Int) = 2*kotlin.math.PI.toFloat()*i/max
-  val radian10 = (1..10).toList().map {angle(it,10)}
+  val radian10 = (1..10).toList().map {angle(it,10)}/*.toFloatArray()*///todo test toFloatArray() performance
 
   class CircleData(val blend:Blend, val getArr:(angle:Float)->FloatArray)
   data class Blend(val src:BlendFactor, val dst:BlendFactor)
@@ -296,6 +296,7 @@ void main(void) {
     val r1 = 1f//Радиус 1f - окружность
     val r0 = 0f//центр круга
     val center = fan.getArr(0f)
+    //todo inline вместо обращения к массиву radian10[3]
     val f0 = fan.getArr(radian10[0])
     val f1 = fan.getArr(radian10[1])
     val f2 = fan.getArr(radian10[2])
