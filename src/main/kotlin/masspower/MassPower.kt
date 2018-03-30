@@ -15,7 +15,7 @@ import org.khronos.webgl.WebGLRenderingContext as WGL
 
 const val DYNAMIC_SHADER = false//default true +1 fps
 const val DYNAMIC_BLEND = true//не влияет на производительность
-
+//todo смёрджить в master
 data class ImgData(val url:String, val width:Int, val height:Int = width)
 class ImgCache(var texture:MassPower.GameTexture? = null)
 data class RenderData(val x:Float,val y:Float,val gameSize:Float,val imgData:ImgData)
@@ -39,20 +39,19 @@ class FixedWidth(val width:Float,val minHeight:Float,val maxHeight:Float):View()
 data class Attr(val locationName:String,val numElements:Int)
 data class IterAttr(val attr:Attr,val location:Int,val offset:Int)
 
-class MassPower(val view:View = FixedWidth(1500f,1000f,1000f)) {
+class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 width
   val gameScale:Float = 1.0f
   val RenderData.scale:Float get() = gameScale * gameSize/imgData.width
   val html = HTMLElements()
   val gl get() = html.webgl
   //language=GLSL
   val vertex = gl.compileShader(/*language=GLSL*/"""
-//Если атрибут в шейдере не используется, то при компиляции об будет вырезан, и могут возникнуть ошибки "enableVertexAttribArray: index out of range"
-attribute vec2 a_center_pos;//игровые координаты центра круга
+//Если атрибут в шейдере не используется, то при компиляции он будет вырезан, и могут возникнуть ошибки "enableVertexAttribArray: index out of range"
+attribute vec2 a_center_pos;//игровые координаты центра круга //todo позиция атрибутов //попробовать lowp
 attribute float a_angle;
-attribute float a_game_radius;//Радиус объекта в игровых координатах. Всегда одинаковый для одного объекта.
-attribute float a_relative_radius;//относительный радиус от [0 до 1] внутри круга и от (1 до inf) вне круга //todo позиция атрибутов, может lowp
+attribute float a_game_radius;//Радиус объекта в игровых координатах. Всегда одинаковый для одного объекта.//так быстрее (+2fps), чем через uniform float u_game_radius;
+attribute float a_relative_radius;//относительный радиус от [0 до 1] внутри круга и от (1 до inf) вне круга
 
-//uniform float u_game_radius;//uniform проигрывает в производительности по сравнению с атрибутом
 uniform float u_game_width;
 uniform float u_game_height;
 //uniform vec2 u_game_camera_x;
@@ -62,7 +61,7 @@ varying vec2 v_textCoord;
 varying float v_distance;//расстояние до круга относительно a_relative_radius. Если 0 то - в круге , если > 0 то точка на растоянии a_relative_radius * v_distance от края круга
 
 void main(void) {
-  v_distance = max(a_relative_radius - 1.0, 0.0);
+  v_distance = max(a_relative_radius - 1.0, 0.0);//todo попробовать не квадратную, а прямоугольную текстуру
   //сейчас из png вырезается элипс, а ещё можно попробовать натягивать прямоугольник, чтобы попадали уголки png
   v_textCoord = vec2(0.5, 0.5) + vec2(cos(a_angle), sin(a_angle)) * 0.5 * min(a_relative_radius, 1.0);
   float currentRadius = a_relative_radius*a_game_radius;
@@ -215,11 +214,11 @@ void main(void) {
     gl.clear(WGL.COLOR_BUFFER_BIT)
     val state = model?.calcDisplayState()
     gl.useProgram(shaderProgram3)
-    if(false)state?.reactive?.forEach {
+    if(true)state?.reactive?.forEach {
       val fan = CircleData(defaultBlend){angle->
         floatArrayOf(/*it.pos.x.toFloat(),it.pos.y.toFloat()*/)
       }
-      renderCircle10(it.pos.x.toFloat(), it.pos.y.toFloat(), it.radius, null,fan)
+      renderCircle10(it.pos.x.toFloat(), it.pos.y.toFloat(), it.radius*1.3f, null,fan)
     }
     gl.useProgram(shaderProgram)
     mutableListOf<RenderData>().apply {
@@ -273,6 +272,16 @@ void main(void) {
 
   fun angle(i:Int,max:Int) = 2*kotlin.math.PI.toFloat()*i/max
   val radian10 = (1..10).toList().map {angle(it,10)}/*.toFloatArray()*///todo test toFloatArray() performance
+  inline val rad0Of10 get() = radian10[0]//todo concrete value test performance
+  inline val rad1Of10 get() = radian10[1]
+  inline val rad2Of10 get() = radian10[2]
+  inline val rad3Of10 get() = radian10[3]
+  inline val rad4Of10 get() = radian10[4]
+  inline val rad5Of10 get() = radian10[5]
+  inline val rad6Of10 get() = radian10[6]
+  inline val rad7Of10 get() = radian10[7]
+  inline val rad8Of10 get() = radian10[8]
+  inline val rad9Of10 get() = radian10[9]
 
   class CircleData(val blend:Blend, val getArr:(angle:Float)->FloatArray)
   data class Blend(val src:BlendFactor, val dst:BlendFactor)
@@ -293,20 +302,10 @@ void main(void) {
     val x = gameX
     val y = gameY
     val notUsed = 0f
-    val gr = gameRadius//так быстрее, чем через uniform (+2fps)
+    val gr = gameRadius
     val r1 = 1f//Радиус 1f - окружность
     val r0 = 0f//центр круга
     val center = fan.getArr(0f)
-    val rad0Of10 = radian10[0]
-    val rad1Of10 = radian10[1]
-    val rad2Of10 = radian10[2]
-    val rad3Of10 = radian10[3]
-    val rad4Of10 = radian10[4]
-    val rad5Of10 = radian10[5]
-    val rad6Of10 = radian10[6]
-    val rad7Of10 = radian10[7]
-    val rad8Of10 = radian10[8]
-    val rad9Of10 = radian10[9]
     //todo inline вместо обращения к массиву radian10[3]
     val f0 = fan.getArr(rad0Of10)
     val f1 = fan.getArr(rad1Of10)
@@ -334,16 +333,16 @@ void main(void) {
       x,y,rad0Of10,gr,r1,*f0
     )
     if(strip != null) {
-      val s0 = strip.getArr(radian10[0])
-      val s1 = strip.getArr(radian10[1])
-      val s2 = strip.getArr(radian10[2])
-      val s3 = strip.getArr(radian10[3])
-      val s4 = strip.getArr(radian10[4])
-      val s5 = strip.getArr(radian10[5])
-      val s6 = strip.getArr(radian10[6])
-      val s7 = strip.getArr(radian10[7])
-      val s8 = strip.getArr(radian10[8])
-      val s9 = strip.getArr(radian10[9])
+      val s0 = strip.getArr(rad0Of10)
+      val s1 = strip.getArr(rad1Of10)
+      val s2 = strip.getArr(rad2Of10)
+      val s3 = strip.getArr(rad3Of10)
+      val s4 = strip.getArr(rad4Of10)
+      val s5 = strip.getArr(rad5Of10)
+      val s6 = strip.getArr(rad6Of10)
+      val s7 = strip.getArr(rad7Of10)
+      val s8 = strip.getArr(rad8Of10)
+      val s9 = strip.getArr(rad9Of10)
       if(DYNAMIC_BLEND) gl.blendFunc(strip.blend.src.value,strip.blend.dst.value)
       val rs = 1.0f + stripRelativeDistance//за кругом glow radius
       render(Mode.TRIANGLE_STRIP,
