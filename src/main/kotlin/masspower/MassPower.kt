@@ -217,7 +217,7 @@ void main(void) {
     val state = model?.calcDisplayState()
     gl.useProgram(shaderProgram3)
     if(false)state?.reactive?.forEach {
-      val fan = CircleData(defaultBlend){cos, sin, angle->
+      val fan = CircleData(defaultBlend){angle->
         floatArrayOf(it.pos.x.toFloat(),it.pos.y.toFloat(),angle)
       }
       renderCircle10(it.radius, null,fan)
@@ -251,7 +251,7 @@ void main(void) {
           img.src = it.imgData.url
         }
         cache.texture?.apply {
-          if(false) {
+          if(false) {//todo удалить как добавлю задник
             gl.bindTexture(WGL.TEXTURE_2D,glTexture)//-2fps
             render(Mode.TRIANGLE,
               it.x,it.y,left,bottom,0f,0f,it.scale,1f,
@@ -262,8 +262,8 @@ void main(void) {
               it.x,it.y,right,bottom,1f,0f,it.scale,1f,
               it.x,it.y,left,bottom,0f,0f,it.scale,1f)
           }
-          val fan = CircleData(defaultBlend) {cos,sin, angle-> floatArrayOf(it.x,it.y,angle)}
-          val strip = CircleData(stripBlend) {cos,sin, angle->
+          val fan = CircleData(defaultBlend) {angle-> floatArrayOf(it.x,it.y,angle)}
+          val strip = CircleData(stripBlend) {angle->
             floatArrayOf(it.x,it.y,angle)
           }
           renderCircle10(it.gameSize, glTexture,fan,strip, 0.75f)
@@ -274,10 +274,8 @@ void main(void) {
 
   fun angle(i:Int,max:Int) = 2*kotlin.math.PI.toFloat()*i/max
   val radian10 = (1..10).toList().map {angle(it,10)}
-  val cos10 = radian10.map {kotlin.math.cos(it)}.toFloatArray()
-  val sin10 = radian10.map {kotlin.math.sin(it)}.toFloatArray()
 
-  class CircleData(val blend:Blend, val getArr:(cos:Float, sin:Float, angle:Float)->FloatArray)
+  class CircleData(val blend:Blend, val getArr:(angle:Float)->FloatArray)
   data class Blend(val src:BlendFactor, val dst:BlendFactor)
   enum class BlendFactor(val value:Int) {
     SRC_COLOR(WGL.SRC_COLOR),
@@ -297,17 +295,17 @@ void main(void) {
     val gr = gameRadius//так быстрее, чем через uniform (+2fps)
     val r1 = 1f//Радиус 1f - окружность
     val r0 = 0f//центр круга
-    val center = fan.getArr(0f,0f, 0f)
-    val f0 = fan.getArr(cos10[0], sin10[0], radian10[0])
-    val f1 = fan.getArr(cos10[1], sin10[1], radian10[1])
-    val f2 = fan.getArr(cos10[2], sin10[2], radian10[2])
-    val f3 = fan.getArr(cos10[3], sin10[3], radian10[3])
-    val f4 = fan.getArr(cos10[4], sin10[4], radian10[4])
-    val f5 = fan.getArr(cos10[5], sin10[5], radian10[5])
-    val f6 = fan.getArr(cos10[6], sin10[6], radian10[6])
-    val f7 = fan.getArr(cos10[7], sin10[7], radian10[7])
-    val f8 = fan.getArr(cos10[8], sin10[8], radian10[8])
-    val f9 = fan.getArr(cos10[9], sin10[9], radian10[9])
+    val center = fan.getArr(0f)
+    val f0 = fan.getArr(radian10[0])
+    val f1 = fan.getArr(radian10[1])
+    val f2 = fan.getArr(radian10[2])
+    val f3 = fan.getArr(radian10[3])
+    val f4 = fan.getArr(radian10[4])
+    val f5 = fan.getArr(radian10[5])
+    val f6 = fan.getArr(radian10[6])
+    val f7 = fan.getArr(radian10[7])
+    val f8 = fan.getArr(radian10[8])
+    val f9 = fan.getArr(radian10[9])
     if(DYNAMIC_BLEND) gl.blendFunc(fan.blend.src.value,fan.blend.dst.value)
     render(Mode.TRIANGLE_FAN,
       gr, r0,*center,
@@ -324,16 +322,16 @@ void main(void) {
       gr, r1,*f0
     )
     if(strip != null) {
-      val s0 = strip.getArr(cos10[0], sin10[0], radian10[0])
-      val s1 = strip.getArr(cos10[1], sin10[1], radian10[1])
-      val s2 = strip.getArr(cos10[2], sin10[2], radian10[2])
-      val s3 = strip.getArr(cos10[3], sin10[3], radian10[3])
-      val s4 = strip.getArr(cos10[4], sin10[4], radian10[4])
-      val s5 = strip.getArr(cos10[5], sin10[5], radian10[5])
-      val s6 = strip.getArr(cos10[6], sin10[6], radian10[6])
-      val s7 = strip.getArr(cos10[7], sin10[7], radian10[7])
-      val s8 = strip.getArr(cos10[8], sin10[8], radian10[8])
-      val s9 = strip.getArr(cos10[9], sin10[9], radian10[9])
+      val s0 = strip.getArr(radian10[0])
+      val s1 = strip.getArr(radian10[1])
+      val s2 = strip.getArr(radian10[2])
+      val s3 = strip.getArr(radian10[3])
+      val s4 = strip.getArr(radian10[4])
+      val s5 = strip.getArr(radian10[5])
+      val s6 = strip.getArr(radian10[6])
+      val s7 = strip.getArr(radian10[7])
+      val s8 = strip.getArr(radian10[8])
+      val s9 = strip.getArr(radian10[9])
       if(DYNAMIC_BLEND) gl.blendFunc(strip.blend.src.value,strip.blend.dst.value)
       val sr = 1.0f + stripRelativeDistance//за кругом glow radius
       render(Mode.TRIANGLE_STRIP,
