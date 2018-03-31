@@ -15,9 +15,9 @@ import org.khronos.webgl.WebGLRenderingContext as WGL
 
 const val DYNAMIC_SHADER = false//default true +1 fps
 const val DYNAMIC_BLEND = true//не влияет на производительность
-const val BACK = false
+const val BACK = true
 const val FRONT = true
-const val SHADER_3 = false
+const val SHADER_3 = true
 
 data class ImgData(val url:String, val width:Int, val height:Int = width)
 class ImgCache(var texture:MassPower.GameTexture? = null)
@@ -146,11 +146,22 @@ void main(void) {
     backgroundShader to gl.createBuffer() ?: lib.log.fatalError("Unable to create webgl buffer!")
   )
 
+  val attributesMap = mapOf(
+    shaderProgram to attributes,
+      shaderProgram3 to attributes3,
+      backgroundShader to backgroundAttributes
+  )
+
   var currentShader:WebGLProgram = backgroundShader
   fun activateShader(shader:WebGLProgram) {
     gl.bindBuffer(WGL.ARRAY_BUFFER,buffers[shader])
     gl.useProgram(shader)
     currentShader = shader
+    attributesMap[shader]!!.forEach {
+      gl.enableVertexAttribArray(it.location)
+      gl.vertexAttribPointer(it.location,it.attr.numElements,WGL.FLOAT,false,/*шаг*/verticesBlockSize[shader]!!*4,it.offset*4)
+      if(false) gl.disableVertexAttribArray(it.location)//Если нужно после рендера отключить эти атрибуты (вероятно чтобы иметь возможность задать новые атрибуты для другого шейдера)
+    }
   }
 
   init {
@@ -161,28 +172,16 @@ void main(void) {
     window.requestAnimationFrame {
 
       activateShader(backgroundShader)
-      backgroundAttributes.forEach {
-        gl.enableVertexAttribArray(it.location)
-        gl.vertexAttribPointer(it.location,it.attr.numElements,WGL.FLOAT,false,/*шаг*/verticesBlockSize[backgroundShader]!!*4,it.offset*4)
-      }
-
-      activateShader(shaderProgram)
-      if(true || FRONT) attributes.forEach {
-        if(FRONT)gl.enableVertexAttribArray(it.location)
-        if(FRONT)gl.vertexAttribPointer(it.location,it.attr.numElements,WGL.FLOAT,false,/*шаг*/verticesBlockSize[shaderProgram]!!*4,it.offset*4)//todo Float32Array.BYTES_PER_ELEMENT
-        if(false) gl.disableVertexAttribArray(it.location)//Если нужно после рендера отключить эти атрибуты (вероятно чтобы иметь возможность задать новые атрибуты для другого шейдера)
-      }
-      if(false) gl.uniform1i(gl.getUniformLocation(shaderProgram,"u_sampler"),0)
-      gl.uniform1f(gl.getUniformLocation(shaderProgram,"u_game_width"),view.gameWidth)
-      gl.uniform1f(gl.getUniformLocation(shaderProgram,"u_game_height"),view.gameHeight)
+      if(FRONT){
+        activateShader(shaderProgram)
+        if(false) gl.uniform1i(gl.getUniformLocation(shaderProgram,"u_sampler"),0)
+        gl.uniform1f(gl.getUniformLocation(shaderProgram,"u_game_width"),view.gameWidth)
+        gl.uniform1f(gl.getUniformLocation(shaderProgram,"u_game_height"),view.gameHeight)
 //      gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram,"u_transform_matrix"),false,view.transformMatrix)
+      }
 
-      if(SHADER_3) {
+      if(SHADER_3 && FRONT) {
         activateShader(shaderProgram3)
-        if(FRONT) attributes3.forEach {
-          gl.enableVertexAttribArray(it.location)
-          gl.vertexAttribPointer(it.location,it.attr.numElements,WGL.FLOAT,false,/*шаг*/verticesBlockSize[shaderProgram3]!!*4,it.offset*4)
-        }
         gl.uniform1f(gl.getUniformLocation(shaderProgram3,"u_game_width"),view.gameWidth)
         gl.uniform1f(gl.getUniformLocation(shaderProgram3,"u_game_height"),view.gameHeight)
       }
