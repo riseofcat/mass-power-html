@@ -15,7 +15,9 @@ import org.khronos.webgl.WebGLRenderingContext as WGL
 
 const val DYNAMIC_SHADER = false//default true +1 fps
 const val DYNAMIC_BLEND = true//не влияет на производительность
-const val BACK = false
+const val BACK = true
+const val FRONT = false
+const val SHADER_3 = false
 
 data class ImgData(val url:String, val width:Int, val height:Int = width)
 class ImgCache(var texture:MassPower.GameTexture? = null)
@@ -48,7 +50,9 @@ class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 widt
   //language=GLSL
   val vertex = /*language=GLSL*/"""
 //Если атрибут в шейдере не используется, то при компиляции он будет вырезан, и могут возникнуть ошибки "enableVertexAttribArray: index out of range"
-attribute vec2 a_center_pos;//игровые координаты центра круга //todo позиция атрибутов //попробовать lowp
+//attribute vec2 a_center_pos;//игровые координаты центра круга //todo позиция атрибутов //попробовать lowp
+attribute float a_center_x;
+attribute float a_center_y;
 attribute float a_angle;
 attribute float a_game_radius;//Радиус объекта в игровых координатах. Всегда одинаковый для одного объекта.//так быстрее (+2fps), чем через uniform float u_game_radius;
 attribute float a_relative_radius;//относительный радиус от [0 до 1] внутри круга и от (1 до inf) вне круга
@@ -68,7 +72,7 @@ void main(void) {
   float currentRadius = a_relative_radius*a_game_radius;
   mat2 screenScale = mat2(2.0/u_game_width,       0.0,
                                 0.0,       2.0/u_game_height);
-  vec2 gamePos = a_center_pos + vec2(cos(a_angle)*currentRadius, sin(a_angle)*currentRadius);
+  vec2 gamePos = /*a_center_pos*/vec2(a_center_x, a_center_y) + vec2(cos(a_angle)*currentRadius, sin(a_angle)*currentRadius);
   gl_Position = vec4(screenScale*gamePos, 1.0, 1.0) - vec4(1.0, 1.0, 0.0, 0.0);
   }
 """
@@ -93,7 +97,7 @@ void main(void) {
   gl_FragColor = vec4(0.3,0.3,0.3,0.4);
 }
 """)
-  val attributes = listOf(Attr("a_center_pos",2), Attr("a_angle",1), Attr("a_game_radius",1), Attr("a_relative_radius",1)).run {
+  val attributes = listOf(/*Attr("a_center_pos",2),*/ Attr("a_center_x",1),Attr("a_center_y",1), Attr("a_angle",1), Attr("a_game_radius",1), Attr("a_relative_radius",1)).run {
     val result = mutableListOf<IterAttr>()
     var currentSize = 0
     forEach {
@@ -102,18 +106,20 @@ void main(void) {
     }
     result
   }
-  val attributes3 = listOf(Attr("a_center_pos",2), Attr("a_angle",1), Attr("a_game_radius",1), Attr("a_relative_radius",1)).run {
+  val attributes3 = listOf(/*Attr("a_center_pos",2),*/ Attr("a_center_x",1),Attr("a_center_y",1), Attr("a_angle",1), Attr("a_game_radius",1), Attr("a_relative_radius",1)).run {
     val result = mutableListOf<IterAttr>()
     var currentSize = 0
     forEach {
-      result.add(IterAttr(it,gl.getAttribLocation(shaderProgram3,it.locationName),currentSize))
-      currentSize += it.numElements
+      if(SHADER_3) {
+        result.add(IterAttr(it,gl.getAttribLocation(shaderProgram3,it.locationName),currentSize))
+        currentSize += it.numElements
+      }
     }
     result
   }
   val backgroundShader:WebGLProgram = gl.createWebGLProgram(shader_mesh_default_vert,shader_background_stars_frag)
   var currentShader:WebGLProgram = backgroundShader//todo bad currentShader
-  val backgroundAttributes = listOf(Attr("aVertexPosition",2)).run {
+  val backgroundAttributes = listOf(Attr("a_x",1),Attr("a_y",1)).run {
     val result = mutableListOf<IterAttr>()
     var currentSize = 0
     forEach {
@@ -135,41 +141,49 @@ void main(void) {
 //  val model:ClientModel? = ClientModel(Conf(5000, "192.168.100.7"))
 //  val model:ClientModel? = Model(Conf(80, "mass-power.herokuapp.com"))
 
+  private val backBuffer = gl.createBuffer() ?: lib.log.fatalError("Unable to create webgl buffer!")
+  private val mainShaderBuffer = gl.createBuffer() ?: lib.log.fatalError("Unable to create webgl buffer!")
+  private val shader3Buffer = gl.createBuffer() ?: lib.log.fatalError("Unable to create webgl buffer!")
+
   init {
     window.onfocus
     window.onblur
     window.onresize = {resize()}
     window.onload = {resize()}
     window.requestAnimationFrame {
-      gl.bindBuffer(WGL.ARRAY_BUFFER,gl.createBuffer() ?: lib.log.fatalError("Unable to create webgl buffer!"))
 
-      gl.useProgram(shaderProgram)
-      currentShader = shaderProgram
-      attributes.forEach {
+      gl.bindBuffer(WGL.ARRAY_BUFFER,backBuffer)
+      gl.useProgram(backgroundShader)
+      currentShader = backgroundShader
+      backgroundAttributes.forEach {
         gl.enableVertexAttribArray(it.location)
-        gl.vertexAttribPointer(it.location,it.attr.numElements,WGL.FLOAT/*TODO FLOAT_VEC2*/,false,/*шаг*/verticesBlockSize[shaderProgram]!!*4,it.offset*4)//todo попробовать разные типы а также lowp precision
-        if(false) gl.disableVertexAttribArray(it.location)//Если нужно после рендера отключить эти атрибуты (вероятно чтобы иметь возможность задать новые атрибуты для другого шейдера)
+        gl.vertexAttribPointer(it.location,it.attr.numElements,WGL.FLOAT,false,/*шаг*/verticesBlockSize[backgroundShader]!!*4,it.offset*4)
       }
-      if(false) gl.uniform1i(gl.getUniformLocation(shaderProgram,"u_sampler"),0)
-      gl.uniform1f(gl.getUniformLocation(shaderProgram,"u_game_width"),view.gameWidth)
-      gl.uniform1f(gl.getUniformLocation(shaderProgram,"u_game_height"),view.gameHeight)
+
+      if(FRONT) {//todo true always !!!!!!!!!!!!!!!!
+        gl.bindBuffer(WGL.ARRAY_BUFFER,mainShaderBuffer)
+        gl.useProgram(shaderProgram)
+        currentShader = shaderProgram
+        attributes.forEach {
+          gl.enableVertexAttribArray(it.location)
+          gl.vertexAttribPointer(it.location,it.attr.numElements,WGL.FLOAT,false,/*шаг*/verticesBlockSize[shaderProgram]!!*4,it.offset*4)//todo Float32Array.BYTES_PER_ELEMENT
+          if(false) gl.disableVertexAttribArray(it.location)//Если нужно после рендера отключить эти атрибуты (вероятно чтобы иметь возможность задать новые атрибуты для другого шейдера)
+        }
+        if(false) gl.uniform1i(gl.getUniformLocation(shaderProgram,"u_sampler"),0)
+        gl.uniform1f(gl.getUniformLocation(shaderProgram,"u_game_width"),view.gameWidth)
+        gl.uniform1f(gl.getUniformLocation(shaderProgram,"u_game_height"),view.gameHeight)
 //      gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram,"u_transform_matrix"),false,view.transformMatrix)
 
-      gl.useProgram(shaderProgram3)
-      currentShader = shaderProgram3
-      attributes3.forEach {
-        gl.enableVertexAttribArray(it.location)
-        gl.vertexAttribPointer(it.location,it.attr.numElements,WGL.FLOAT,false,/*шаг*/verticesBlockSize[shaderProgram3]!!*4,it.offset*4)
-      }
-      gl.uniform1f(gl.getUniformLocation(shaderProgram3,"u_game_width"),view.gameWidth)
-      gl.uniform1f(gl.getUniformLocation(shaderProgram3,"u_game_height"),view.gameHeight)
-
-      if(BACK) {
-        gl.useProgram(backgroundShader)
-        currentShader = backgroundShader
-        backgroundAttributes.forEach {
-          gl.enableVertexAttribArray(it.location)
-          gl.vertexAttribPointer(it.location,it.attr.numElements,WGL.FLOAT,false,/*шаг*/verticesBlockSize[backgroundShader]!!*4,it.offset*4)
+        if(SHADER_3) {
+          gl.bindBuffer(WGL.ARRAY_BUFFER,shader3Buffer)
+          gl.useProgram(shaderProgram3)
+          currentShader = shaderProgram3
+          attributes3.forEach {
+            gl.enableVertexAttribArray(it.location)
+            gl.vertexAttribPointer(it.location,it.attr.numElements,WGL.FLOAT,false,/*шаг*/verticesBlockSize[shaderProgram3]!!*4,it.offset*4)
+          }
+          gl.uniform1f(gl.getUniformLocation(shaderProgram3,"u_game_width"),view.gameWidth)
+          gl.uniform1f(gl.getUniformLocation(shaderProgram3,"u_game_height"),view.gameHeight)
         }
       }
 
@@ -250,6 +264,7 @@ void main(void) {
     val state = model?.calcDisplayState()
 
     if(BACK) {
+      gl.bindBuffer(WGL.ARRAY_BUFFER,backBuffer)
       gl.useProgram(backgroundShader)
       currentShader = backgroundShader
 //      gl.uniform1f(gl.getUniformLocation(backgroundShader,"resolution"),width,height)
@@ -260,16 +275,22 @@ void main(void) {
         1f,1f,  -1f,1f,  1f,-1f)
     }
 
-    gl.useProgram(shaderProgram3)
-    currentShader = shaderProgram3
-
-    if(true)state?.reactive?.forEach {
-      val fan = CircleData(defaultBlend){angle->
-        floatArrayOf(/*it.pos.x.toFloat(),it.pos.y.toFloat()*/)
+    if(FRONT && SHADER_3) {
+      gl.bindBuffer(WGL.ARRAY_BUFFER,shader3Buffer)
+      gl.useProgram(shaderProgram3)
+      currentShader = shaderProgram3
+      state?.reactive?.forEach {
+        val fan = CircleData(defaultBlend){angle->
+          floatArrayOf(/*it.pos.x.toFloat(),it.pos.y.toFloat()*/)
+        }
+        renderCircle10(it.pos.x.toFloat(), it.pos.y.toFloat(), it.radius*1.3f, null,fan)
       }
-      renderCircle10(it.pos.x.toFloat(), it.pos.y.toFloat(), it.radius*1.3f, null,fan)
     }
-    gl.useProgram(shaderProgram)
+
+    if(FRONT) {
+      gl.bindBuffer(WGL.ARRAY_BUFFER,mainShaderBuffer)
+      gl.useProgram(shaderProgram)
+    }
     currentShader = shaderProgram
     mutableListOf<RenderData>().apply {
       if(state != null) {
@@ -303,7 +324,7 @@ void main(void) {
           val strip = CircleData(stripBlend) {angle->
             floatArrayOf(/*it.x,it.y*/)
           }
-          renderCircle10(it.x, it.y, it.gameSize, glTexture,fan,strip, 0.75f)
+          if(FRONT)renderCircle10(it.x, it.y, it.gameSize, glTexture,fan,strip, 0.75f)
         }
       }
     window.requestAnimationFrame(::gameLoop)
