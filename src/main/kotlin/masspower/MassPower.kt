@@ -41,39 +41,12 @@ data class IterAttr(val attr:Attr,val location:Int,val offset:Int)
 
 class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 width
 
-  inner class ShaderVertex(val src:String, val attrList:List<Attr>)
-  inner class ShaderFull(val vert:ShaderVertex, frag:String) {
-    val shaderProgram = gl.createWebGLProgram(vert.src,frag)
-    val attributes = vert.attrList.run {
-      val result = mutableListOf<IterAttr>()
-      var currentSize = 0
-      forEach {
-        result.add(IterAttr(it,gl.getAttribLocation(shaderProgram,it.locationName),currentSize))
-        currentSize += it.numElements
-      }
-      result
-    }
-    val blockSize = attributes.sumBy {it.attr.numElements}
-    val buffer = gl.createBuffer() ?: lib.log.fatalError("Unable to create webgl buffer!")
-    fun activate() {
-      currentShader = this
-      gl.bindBuffer(WGL.ARRAY_BUFFER,buffer)
-      gl.useProgram(shaderProgram)
-      attributes.forEach {
-        gl.enableVertexAttribArray(it.location)
-        gl.vertexAttribPointer(it.location,it.attr.numElements,WGL.FLOAT,false,/*шаг*/blockSize*4,it.offset*4)
-        if(false) gl.disableVertexAttribArray(it.location)//Если нужно после рендера отключить эти атрибуты (вероятно чтобы иметь возможность задать новые атрибуты для другого шейдера)
-      }
-    }
-  }
-  var currentShader:ShaderFull? = null
-
   val gameScale:Float = 1.0f
   val RenderData.scale:Float get() = gameScale * gameSize/imgData.width
   val html = HTMLElements()
   val gl get() = html.webgl
-  //language=GLSL
-  val vertex = /*language=GLSL*/"""
+//language=GLSL
+  val vertex = """
 //Если атрибут в шейдере не используется, то при компиляции он будет вырезан, и могут возникнуть ошибки "enableVertexAttribArray: index out of range"
 //attribute vec2 a_center_pos;//игровые координаты центра круга //todo позиция атрибутов //попробовать lowp
 attribute float a_center_x;
@@ -106,7 +79,7 @@ void main(void) {
       vertex,
       listOf(/*Attr("a_center_pos",2),*/ Attr("a_center_x",1),Attr("a_center_y",1),Attr("a_angle",1),Attr("a_game_radius",1),Attr("a_relative_radius",1))
     ),
-/*language=GLSL*/
+//language=GLSL
 """
 precision mediump float;
 uniform sampler2D u_sampler;
@@ -122,9 +95,9 @@ void main(void) {
       vertex,
       listOf(/*Attr("a_center_pos",2),*/ Attr("a_center_x",1),Attr("a_center_y",1), Attr("a_angle",1), Attr("a_game_radius",1), Attr("a_relative_radius",1))
     ),
+//language=GLSL
 """
 precision mediump float;
-uniform sampler2D u_sampler;
 void main(void) {
   gl_FragColor = vec4(0.3,0.3,0.3,0.4);
 }
@@ -142,18 +115,13 @@ void main(void) {
     window.onresize = {resize()}
     window.onload = {resize()}
     window.requestAnimationFrame {
-
       backgroundShader.activate()
-
       textureShader.activate()
-      if(false) gl.uniform1i(gl.getUniformLocation(textureShader.shaderProgram,"u_sampler"),0)
-      gl.uniform1f(gl.getUniformLocation(textureShader.shaderProgram,"u_game_width"),view.gameWidth)
-      gl.uniform1f(gl.getUniformLocation(textureShader.shaderProgram,"u_game_height"),view.gameHeight)
-//      gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram,"u_transform_matrix"),false,view.transformMatrix)
+      if(false) setUniform1i("u_sampler", 0)
+      setUniform1f("u_game_width", view.gameWidth)
+      setUniform1f("u_game_height", view.gameHeight)
 
       colorShader.activate()
-      gl.uniform1f(gl.getUniformLocation(colorShader.shaderProgram,"u_game_width"),view.gameWidth)
-      gl.uniform1f(gl.getUniformLocation(colorShader.shaderProgram,"u_game_height"),view.gameHeight)
 
       gl.enable(WGL.BLEND)
       if(!DYNAMIC_BLEND) gl.blendFunc(defaultBlend.src.value,defaultBlend.dst.value)
@@ -233,7 +201,7 @@ void main(void) {
 
     backgroundShader.activate()
 //      gl.uniform1f(gl.getUniformLocation(backgroundShader,"resolution"),width,height)
-    gl.uniform1f(gl.getUniformLocation(backgroundShader.shaderProgram,"time"),lib.pillarTimeS(10_000f).toFloat())
+    setUniform1f("time", lib.pillarTimeS(10_000f).toFloat())
 //      gl.uniform1f(gl.getUniformLocation(backgroundShader,"mouse"),backgroundOffset.xf,backgroundOffset.yf)
     render(Mode.TRIANGLE,
       -1f,-1f,  -1f,1f,  1f,-1f,
@@ -377,6 +345,40 @@ void main(void) {
     if(true) gl.activeTexture(WGL.TEXTURE0)
     gl.bufferData(WGL.ARRAY_BUFFER,mesh,WGL.DYNAMIC_DRAW)
     gl.drawArrays(mode.glMode,0,allFloatArgsCount/currentShader?.blockSize!!)//todo first, count
+  }
+
+  lateinit var currentShader:ShaderFull
+  val uniforms:MutableMap<String, Float> = mutableMapOf()
+  fun setUniform1f(name:String, value:Float) {//todo vararg and int
+    uniforms[name] = value
+    gl.uniform1f(gl.getUniformLocation(currentShader.shaderProgram,name),value)
+  }
+  fun setUniform1i(s:String,i:Int) {TODO("setUniform1i")}
+  inner class ShaderVertex(val src:String, val attrList:List<Attr>)
+  inner class ShaderFull(val vert:ShaderVertex, frag:String) {
+    val shaderProgram = gl.createWebGLProgram(vert.src,frag)
+    val attributes = vert.attrList.run {
+      val result = mutableListOf<IterAttr>()
+      var currentSize = 0
+      forEach {
+        result.add(IterAttr(it,gl.getAttribLocation(shaderProgram,it.locationName),currentSize))
+        currentSize += it.numElements
+      }
+      result
+    }
+    val blockSize = attributes.sumBy {it.attr.numElements}
+    val buffer = gl.createBuffer() ?: lib.log.fatalError("Unable to create webgl buffer!")
+    fun activate() {
+      currentShader = this
+      gl.bindBuffer(WGL.ARRAY_BUFFER,buffer)
+      gl.useProgram(shaderProgram)
+      uniforms.entries.forEach {(k,v)-> gl.uniform1f(gl.getUniformLocation(currentShader.shaderProgram,k),v)}//todo optimize
+      attributes.forEach {
+        gl.enableVertexAttribArray(it.location)
+        gl.vertexAttribPointer(it.location,it.attr.numElements,WGL.FLOAT,false,/*шаг*/blockSize*4,it.offset*4)
+        if(false) gl.disableVertexAttribArray(it.location)//Если нужно после рендера отключить эти атрибуты (вероятно чтобы иметь возможность задать новые атрибуты для другого шейдера)
+      }
+    }
   }
 }
 
