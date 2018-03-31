@@ -118,7 +118,7 @@ void main(void) {
     result
   }
   val backgroundShader:WebGLProgram = gl.createWebGLProgram(shader_mesh_default_vert,shader_background_stars_frag)
-  val backgroundAttributes = listOf(Attr("a_x",1),Attr("a_y",1)).run {
+  val backgroundAttributes = listOf(Attr("aVertexPosition",2)).run {
     val result = mutableListOf<IterAttr>()
     var currentSize = 0
     forEach {
