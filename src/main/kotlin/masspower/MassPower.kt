@@ -15,6 +15,7 @@ import org.khronos.webgl.WebGLRenderingContext as WGL
 
 const val DYNAMIC_SHADER = false//default true +1 fps
 const val DYNAMIC_BLEND = true//не влияет на производительность
+const val BACK = false
 
 data class ImgData(val url:String, val width:Int, val height:Int = width)
 class ImgCache(var texture:MassPower.GameTexture? = null)
@@ -84,33 +85,7 @@ void main(void) {
   gl_FragColor.a = gl_FragColor.a / pow(1.0 + v_distance, 6.0);//todo потестировать performance pow() vs деление много раз
 }
 """)
-  val shaderProgram3:WebGLProgram = gl.createWebGLProgram(
-/*language=GLSL*/"""
-//Если атрибут в шейдере не используется, то при компиляции он будет вырезан, и могут возникнуть ошибки "enableVertexAttribArray: index out of range"
-attribute vec2 a_center_pos;//игровые координаты центра круга //todo позиция атрибутов //попробовать lowp
-attribute float a_angle;
-attribute float a_game_radius;//Радиус объекта в игровых координатах. Всегда одинаковый для одного объекта.//так быстрее (+2fps), чем через uniform float u_game_radius;
-attribute float a_relative_radius;//относительный радиус от [0 до 1] внутри круга и от (1 до inf) вне круга
-
-uniform float u_game_width;
-uniform float u_game_height;
-//uniform vec2 u_game_camera_x;
-//uniform vec2 u_game_camera_y;
-
-varying vec2 v_textCoord;
-varying float v_distance;//расстояние до круга относительно a_relative_radius. Если 0 то - в круге , если > 0 то точка на растоянии a_relative_radius * v_distance от края круга
-
-void main(void) {
-  v_distance = max(a_relative_radius - 1.0, 0.0);//todo попробовать не квадратную, а прямоугольную текстуру
-  //сейчас из png вырезается элипс, а ещё можно попробовать натягивать прямоугольник, чтобы попадали уголки png
-  v_textCoord = vec2(0.5, 0.5) + vec2(cos(a_angle), sin(a_angle)) * 0.5 * min(a_relative_radius, 1.0);
-  float currentRadius = a_relative_radius*a_game_radius;
-  mat2 screenScale = mat2(2.0/u_game_width,       0.0,
-                                0.0,       2.0/u_game_height);
-  vec2 gamePos = a_center_pos + vec2(cos(a_angle)*currentRadius, sin(a_angle)*currentRadius);
-  gl_Position = vec4(screenScale*gamePos, 1.0, 1.0) - vec4(1.0, 1.0, 0.0, 0.0);
-  }
-""",
+  val shaderProgram3:WebGLProgram = gl.createWebGLProgram(vertex,
 """
 precision mediump float;
 uniform sampler2D u_sampler;
@@ -131,7 +106,7 @@ void main(void) {
     val result = mutableListOf<IterAttr>()
     var currentSize = 0
     forEach {
-      result.add(IterAttr(it,gl.getAttribLocation(shaderProgram,it.locationName),currentSize))
+      result.add(IterAttr(it,gl.getAttribLocation(shaderProgram3,it.locationName),currentSize))
       currentSize += it.numElements
     }
     result
@@ -168,18 +143,11 @@ void main(void) {
     window.requestAnimationFrame {
       gl.bindBuffer(WGL.ARRAY_BUFFER,gl.createBuffer() ?: lib.log.fatalError("Unable to create webgl buffer!"))
 
-      gl.useProgram(backgroundShader)
-      currentShader = backgroundShader
-      backgroundAttributes.forEach {
-        gl.enableVertexAttribArray(it.location)
-        gl.vertexAttribPointer(it.location,it.attr.numElements,WGL.FLOAT,false,/*шаг*/verticesBlockSize[backgroundShader]!!*4,it.offset*4)
-      }
-
       gl.useProgram(shaderProgram)
       currentShader = shaderProgram
       attributes.forEach {
         gl.enableVertexAttribArray(it.location)
-        gl.vertexAttribPointer(it.location,it.attr.numElements,WGL.FLOAT,false,/*шаг*/verticesBlockSize[shaderProgram]!!*4,it.offset*4)//todo попробовать разные типы а также lowp precision
+        gl.vertexAttribPointer(it.location,it.attr.numElements,WGL.FLOAT/*TODO FLOAT_VEC2*/,false,/*шаг*/verticesBlockSize[shaderProgram]!!*4,it.offset*4)//todo попробовать разные типы а также lowp precision
         if(false) gl.disableVertexAttribArray(it.location)//Если нужно после рендера отключить эти атрибуты (вероятно чтобы иметь возможность задать новые атрибуты для другого шейдера)
       }
       if(false) gl.uniform1i(gl.getUniformLocation(shaderProgram,"u_sampler"),0)
@@ -195,6 +163,15 @@ void main(void) {
       }
       gl.uniform1f(gl.getUniformLocation(shaderProgram3,"u_game_width"),view.gameWidth)
       gl.uniform1f(gl.getUniformLocation(shaderProgram3,"u_game_height"),view.gameHeight)
+
+      if(BACK) {
+        gl.useProgram(backgroundShader)
+        currentShader = backgroundShader
+        backgroundAttributes.forEach {
+          gl.enableVertexAttribArray(it.location)
+          gl.vertexAttribPointer(it.location,it.attr.numElements,WGL.FLOAT,false,/*шаг*/verticesBlockSize[backgroundShader]!!*4,it.offset*4)
+        }
+      }
 
       gl.enable(WGL.BLEND)
       if(!DYNAMIC_BLEND) gl.blendFunc(defaultBlend.src.value,defaultBlend.dst.value)
@@ -272,23 +249,19 @@ void main(void) {
     gl.clear(WGL.COLOR_BUFFER_BIT)
     val state = model?.calcDisplayState()
 
-    gl.useProgram(backgroundShader)
-    currentShader = backgroundShader
+    if(BACK) {
+      gl.useProgram(backgroundShader)
+      currentShader = backgroundShader
 //      gl.uniform1f(gl.getUniformLocation(backgroundShader,"resolution"),width,height)
-    gl.uniform1f(gl.getUniformLocation(backgroundShader,"time"),lib.pillarTimeS(10_000f).toFloat())
+      gl.uniform1f(gl.getUniformLocation(backgroundShader,"time"),lib.pillarTimeS(10_000f).toFloat())
 //      gl.uniform1f(gl.getUniformLocation(backgroundShader,"mouse"),backgroundOffset.xf,backgroundOffset.yf)
-//    render(Mode.TRIANGLE, -1.0f,1.0f,  -1.0f,-1.0f,  1.0f,-1.0f)//todo
-//      ,1.0f,-1.0f,   1.0f,1.0f,   -1.0f,1.0f)
+      render(Mode.TRIANGLE,
+        -1f,-1f,  -1f,1f,  1f,-1f,
+        1f,1f,  -1f,1f,  1f,-1f)
+    }
 
     gl.useProgram(shaderProgram3)
     currentShader = shaderProgram3
-
-    if(true) {
-      render(Mode.TRIANGLE,
-        100f,100f,0f,200f,1f,
-        100f,100f,1f,200f,1f,
-        100f,100f,2f,200f,1f)
-    }
 
     if(true)state?.reactive?.forEach {
       val fan = CircleData(defaultBlend){angle->
@@ -326,13 +299,6 @@ void main(void) {
           img.src = it.imgData.url
         }
         cache.texture?.apply {
-          if(true) {//todo удалить как добавлю задник
-            gl.bindTexture(WGL.TEXTURE_2D,glTexture)//-2fps
-            render(Mode.TRIANGLE,
-              it.x,it.y,0f,it.gameSize*2,1f,
-              it.x,it.y,1f,it.gameSize*2,1f,
-              it.x,it.y,2f,it.gameSize*2,1f)
-          }
           val fan = CircleData(defaultBlend) {angle-> floatArrayOf(/*it.x,it.y*/)}
           val strip = CircleData(stripBlend) {angle->
             floatArrayOf(/*it.x,it.y*/)
