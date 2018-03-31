@@ -408,8 +408,8 @@ void main(void) {
   inline fun render(mode:Mode,lambda:MutableList<Float>.()->Unit) = render(mode,arrayListOf<Float>().also {it.lambda()}.toFloatArray())
   inline fun render(mode:Mode,mesh:Float32Array,allFloatArgsCount:Int) {
     lib.debug {
-      if(allFloatArgsCount<=0) lib.log.errorr("allFloatArgsCount<=0")
-      if(allFloatArgsCount%verticesBlockSize[currentShader]!! !=0) lib.log.errorr("Number of vertices not a multiple of the attribute block size! allFloatArgsCount: $allFloatArgsCount,  verticesBlockSize: ${verticesBlockSize[currentShader]!!}")
+      if(allFloatArgsCount<=0) lib.log.error("allFloatArgsCount<=0")
+      if(allFloatArgsCount%verticesBlockSize[currentShader]!! !=0) lib.log.error("Number of vertices not a multiple of the attribute block size! allFloatArgsCount: $allFloatArgsCount,  verticesBlockSize: ${verticesBlockSize[currentShader]!!}")
     }
     if(true) gl.activeTexture(WGL.TEXTURE0)
     gl.bufferData(WGL.ARRAY_BUFFER,mesh,WGL.DYNAMIC_DRAW)
