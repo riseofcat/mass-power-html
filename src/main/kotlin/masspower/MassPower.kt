@@ -14,7 +14,6 @@ import org.khronos.webgl.WebGLRenderingContext as WGL
 
 const val DYNAMIC_BLEND = true//не влияет на производительность
 const val TEXT = true
-
 data class ImgData(val url:String)
 class ImgCache(var texture:MassPower.GameTexture? = null)
 data class RenderData(val x:Float,val y:Float,val gameSize:Float,val imgData:ImgData)
@@ -22,15 +21,12 @@ abstract class View {
   abstract fun getWidth(aspectRation:Float):Float
   abstract fun getHeight(aspectRation:Float):Float
 }
-
 class FixedWidth(val width:Float,val minHeight:Float,val maxHeight:Float):View() {
   override fun getWidth(aspectRation:Float) = width
   override fun getHeight(aspectRation:Float) = (width/aspectRation).max(minHeight).min(maxHeight)
 }
-
 data class Attr(val locationName:String,val numElements:Int)
 data class IterAttr(val attr:Attr,val location:Int,val offset:Int)
-
 class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 width   //todo высчитывать исходя из радиуса обзора
   val View.gameWidth:Float get() = getWidth(window.innerWidth/window.innerHeight.toFloat())*gameScale
   val View.gameHeight:Float get() = getHeight(window.innerWidth/window.innerHeight.toFloat())*gameScale
@@ -46,8 +42,8 @@ class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 widt
   val gl get() = html.webgl
 //language=GLSL
   val vertex = """
+//todo оптимизировать шейдеры lowp
 //Если атрибут в шейдере не используется, то при компиляции он будет вырезан, и могут возникнуть ошибки "enableVertexAttribArray: index out of range"
-//attribute vec2 a_center_pos; //todo позиция атрибутов //попробовать lowp
 attribute float a_center_x;//игровые координаты центра круга
 attribute float a_center_y;
 attribute float a_angle;
@@ -101,8 +97,8 @@ void main(void) {
   val backgroundShader = ShaderFull(ShaderVertex(shader_mesh_default_vert, listOf(Attr("aVertexPosition",2))), shader_background_stars_frag)
   private val imgCache:MutableMap<ImgData,ImgCache> = hashMapOf()
   var mousePos:XY = XY()
-  var model:ClientModel = ClientModel(Conf(5000, "localhost"))
-//  val model:ClientModel? = ClientModel(Conf(5000, "192.168.100.7"))
+//  var model:ClientModel = ClientModel(Conf(5000, "localhost"))
+  val model:ClientModel? = ClientModel(Conf(5000, "192.168.100.7"))
 //  val model:ClientModel? = ClientModel(Conf(80, "mass-power.herokuapp.com"))
 
   init {
@@ -204,7 +200,7 @@ void main(void) {
     setUniformf("u_game_height", view.gameHeight)
     setUniformf("resolution", view.windowWidth, view.windowHeight)
     backgroundShader.activate()
-    setUniformf("time", lib.pillarTimeS(10_000f).toFloat())
+    setUniformf("time", 2f - lib.pillarTimeS(4f).toFloat())//lowp от -2.0 до 2.0
     render(Mode.TRIANGLE,-1f,-1f,-1f,1f,1f,-1f,1f,1f,-1f,1f,1f,-1f)
     colorShader.activate()
     state?.reactive?.forEach {
