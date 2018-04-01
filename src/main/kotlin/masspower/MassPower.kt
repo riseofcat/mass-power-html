@@ -1,7 +1,6 @@
 package masspower
 
 import com.riseofcat.client.*
-import com.riseofcat.common.*
 import com.riseofcat.lib.*
 import com.riseofcat.share.mass.*
 import kuden.*
@@ -17,7 +16,7 @@ const val DYNAMIC_SHADER = false//default true +1 fps
 const val DYNAMIC_BLEND = true//не влияет на производительность
 const val TEXT = true
 
-data class ImgData(val url:String, val width:Int, val height:Int = width)
+data class ImgData(val url:String)
 class ImgCache(var texture:MassPower.GameTexture? = null)
 data class RenderData(val x:Float,val y:Float,val gameSize:Float,val imgData:ImgData)
 abstract class View {
@@ -65,7 +64,7 @@ varying vec2 v_textCoord;
 varying float v_distance;//расстояние до круга относительно a_relative_radius. Если 0 то - в круге , если > 0 то точка на растоянии a_relative_radius * v_distance от края круга
 
 void main(void) {
-  v_distance = max(a_relative_radius - 1.0, 0.0);//todo попробовать не квадратную, а прямоугольную текстуру
+  v_distance = max(a_relative_radius - 1.0, 0.0);
   //сейчас из png вырезается элипс, а ещё можно попробовать натягивать прямоугольник, чтобы попадали уголки png
   v_textCoord = vec2(0.5, 0.5) + vec2(cos(a_angle), sin(a_angle)) * 0.5 * min(a_relative_radius, 1.0);
   float currentRadius = a_relative_radius*a_game_radius;
@@ -171,13 +170,14 @@ void main(void) {
   var fps500 = 30f
   val defaultBlend = Blend(BlendFactor.SRC_ALPHA, BlendFactor.ONE_MINUS_SRC_ALPHA)
   val stripBlend = Blend(BlendFactor.SRC_ALPHA, if(true) BlendFactor.ONE_MINUS_SRC_ALPHA else BlendFactor.DST_ALPHA)
-  val imgBig = ImgData("img/smiley.png",1024)
-  val imgRed = ImgData("img/smiley_small_rect_red.png",128)
-  val imgGreen = ImgData("img/smiley_small_rect_green.png",128)
-  val imgBlue = ImgData("img/smiley_small_rect_blue.png",128)
-  val imgYellow = ImgData("img/smiley_small_rect_yellow.png",128)
-  val imgViolet = ImgData("img/smiley_small_rect_violet.png",128)
-  val imgGray = ImgData("img/smiley_small_rect_gray.png",128)
+  val imgBig = ImgData("img/smiley.png")
+  val imgRed = ImgData("img/smiley_small_rect_red.png")
+  val imgGreen = ImgData("img/smiley_small_rect_green.png")
+  val imgBlue = ImgData("img/smiley_small_rect_blue.png")
+  val imgYellow = ImgData("img/smiley_small_rect_yellow.png")
+  val imgViolet = ImgData("img/smiley_small_rect_violet.png")
+  val imgGray = ImgData("img/smiley_small_rect_gray.png")
+  val imgNonQuadrat = ImgData("img/rect_long.png")
   val colors = listOf(imgRed,imgGreen,imgBlue,imgYellow,imgViolet)
   val PlayerId.color get() = colors.let {it[id%it.size]}
   var cameraGamePos = XY(0f,0f)
@@ -199,7 +199,7 @@ void main(void) {
       html.canvas2d.clearRect(0.0,0.0,view.gameWidth.toDouble(),view.gameHeight.toDouble())//todo why gameWidth?
       html.canvas2d.fillStyle = "white"
       html.canvas2d.font = "bold 24pt Arial"
-      for(i in 0 until lines.size) html.canvas2d.fillText(lines[i],200.0,400.0+50*i)
+      for(i in 0 until lines.size) html.canvas2d.fillText(lines[i],10.0,10.0+50*(i+1))
     }
     gl.clearColor(0f,0f,0f,1f)
     gl.clear(WGL.COLOR_BUFFER_BIT)
@@ -214,7 +214,7 @@ void main(void) {
     colorShader.activate()
     state?.reactive?.forEach {
       val fan = CircleData(defaultBlend){angle-> floatArrayOf(/*it.pos.x.toFloat(),it.pos.y.toFloat()*/)}
-      renderCircle10(it.pos.x.toFloat(), it.pos.y.toFloat(), it.radius*1.3f, null,fan)
+      renderCircle10(it.pos.x.toFloat(), it.pos.y.toFloat(), it.radius*1.8f, null,fan)
     }
     textureShader.activate()
     mutableListOf<RenderData>().apply {
@@ -240,6 +240,7 @@ void main(void) {
       }
       add(RenderData(mousePos.x.toFloat(),mousePos.y.toFloat(),30f,imgViolet))
       add(RenderData(mousePos.x.toFloat(),mousePos.y.toFloat(),30f,imgBig))
+      add(RenderData(mousePos.x.toFloat(),mousePos.y.toFloat(),30f,imgNonQuadrat))
     }.forEach {
         val cache = imgCache[it.imgData] ?: ImgCache().apply {
           imgCache[it.imgData] = this
