@@ -57,8 +57,8 @@ attribute float a_relative_radius;//относительный радиус от
 
 uniform float u_game_width;
 uniform float u_game_height;
-//uniform vec2 u_game_camera_x;
-//uniform vec2 u_game_camera_y;
+uniform float u_game_camera_x;
+uniform float u_game_camera_y;
 
 varying vec2 v_textCoord;
 varying float v_distance;//расстояние до круга относительно a_relative_radius. Если 0 то - в круге , если > 0 то точка на растоянии a_relative_radius * v_distance от края круга
@@ -71,7 +71,7 @@ void main(void) {
   mat2 screenScale = mat2(2.0/u_game_width,       0.0,
                                 0.0,       2.0/u_game_height);
   vec2 gamePos = /*a_center_pos*/vec2(a_center_x, a_center_y) + vec2(cos(a_angle)*currentRadius, sin(a_angle)*currentRadius);
-  gl_Position = vec4(screenScale*gamePos, 1.0, 1.0) - vec4(1.0, 1.0, 0.0, 0.0);
+  gl_Position = vec4(screenScale*(gamePos - vec2(u_game_camera_x, u_game_camera_y)), 1.0, 1.0);
   }
 """
   val textureShader:ShaderFull = ShaderFull(
@@ -105,7 +105,7 @@ void main(void) {
   val backgroundShader = ShaderFull(ShaderVertex(shader_mesh_default_vert, listOf(Attr("aVertexPosition",2))), shader_background_stars_frag)
   private val imgCache:MutableMap<ImgData,ImgCache> = hashMapOf()
   var mousePos:XY = XY()
-  val model:ClientModel? = ClientModel(Conf(5000))
+  var model:ClientModel = ClientModel(Conf(5000))
 //  val model:ClientModel? = ClientModel(Conf(5000, "192.168.100.7"))
 //  val model:ClientModel? = Model(Conf(80, "mass-power.herokuapp.com"))
 
@@ -128,7 +128,10 @@ void main(void) {
       gameLoop(it)
     }
 
-    infix fun View.screenToGame(screen:XY) = XY((screen.x-borderLeft)*gameWidth/windowWidth, gameHeight-(screen.y-borderTop)*gameHeight/windowHeight)
+    infix fun View.screenToGame(screen:XY) = XY(
+      (screen.x-borderLeft)*gameWidth/windowWidth - gameWidth/2 + cameraGamePos.x,
+      gameHeight/2-(screen.y-borderTop)*gameHeight/windowHeight + cameraGamePos.y
+    )
     document.onmousemove = fun(event:Event) {
       if(event is MouseEvent) {
         mousePos = view screenToGame event.xy
@@ -181,6 +184,7 @@ void main(void) {
   val imgGray = ImgData("img/smiley_small_rect_gray.png",128)
   val colors = listOf(imgRed,imgGreen,imgBlue,imgYellow,imgViolet)
   val PlayerId.color get() = colors.let {it[id%it.size]}
+  var cameraGamePos = XY(0f,0f)
 
   private fun gameLoop(милисекундСоСтараПлюсБездействие:Double):Unit = lib.saveInvoke {
     fps30 = (fps30*30+1f/(time-previousTime)).toFloat()/(30+1)
@@ -220,7 +224,14 @@ void main(void) {
       if(state != null) {
         state.foods.forEach {add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),it.radius,imgGray))}
         if(true) state.reactive.forEach {add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),it.radius,it.owner.color))}
-        state.cars.forEach {add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),it.radius,it.owner.color))}
+        state.cars.forEach {
+          if(it.owner == model?.welcome?.id) {
+            cameraGamePos = it.pos.copy()
+            setUniform1f("u_game_camera_x", it.pos.x.toFloat())
+            setUniform1f("u_game_camera_y", it.pos.y.toFloat())
+          }
+          add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),it.radius,it.owner.color))
+        }
       }
       add(RenderData(mousePos.x.toFloat(),mousePos.y.toFloat(),30f,imgViolet))
       add(RenderData(mousePos.x.toFloat(),mousePos.y.toFloat(),30f,imgBig))
@@ -248,7 +259,10 @@ void main(void) {
           val strip = CircleData(stripBlend) {angle->
             floatArrayOf(/*it.x,it.y*/)
           }
-          renderCircle10(it.x, it.y, it.gameSize, glTexture,fan,strip, 0.75f)
+          if(state != null) {//todo redundant state!=null
+            val (x,y) = model.calcRenderXY(state,XY(it.x,it.y),cameraGamePos)
+            renderCircle10(x.toFloat(), y.toFloat(), it.gameSize, glTexture,fan,strip, 0.75f)
+          }
         }
       }
     window.requestAnimationFrame(::gameLoop)
