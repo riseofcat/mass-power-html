@@ -43,7 +43,7 @@ class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 widt
 
   val gameScale:Float get() = currentGameScale
   var currentGameScale = 1f
-  val targetGameScale get() = model.myCar?.run {1f + 3 * lib.Fun.arg0toInf(speed.len, 1000.0).toFloat()}?:1f//todo car size
+  val targetGameScale get() = model?.myCar?.run {1f + 3 * lib.Fun.arg0toInf(speed.len, 1000.0).toFloat()}?:1f//todo car size
   val html = HTMLElements()
   val gl get() = html.webgl
 //language=GLSL
@@ -106,9 +106,9 @@ void main(void) {
   val backgroundShader = ShaderFull(ShaderVertex(shader_mesh_default_vert, listOf(Attr("aVertexPosition",2))), shader_background_stars_frag)
   private val imgCache:MutableMap<ImgData,ImgCache> = hashMapOf()
   var mousePos:XY = XY()
-  var model:ClientModel = ClientModel(Conf(5000))
+  var model:ClientModel = ClientModel(Conf(5000, "localhost"))
 //  val model:ClientModel? = ClientModel(Conf(5000, "192.168.100.7"))
-//  val model:ClientModel? = Model(Conf(80, "mass-power.herokuapp.com"))
+//  val model:ClientModel? = ClientModel(Conf(80, "mass-power.herokuapp.com"))
 
   init {
     window.onfocus
@@ -195,11 +195,15 @@ void main(void) {
       html.canvas2d.clearRect(0.0,0.0,view.gameWidth.toDouble(),view.gameHeight.toDouble())//todo why gameWidth?
       html.canvas2d.fillStyle = "white"
       html.canvas2d.font = "bold 24pt Arial"
+      //todo сделать без экранных координат
       html.canvas2d.fillText("mouse: ${mousePos}",200.0,400.0)//todo протестировать производительность за пределами области рисования
       html.canvas2d.fillText("fps30: $fps30",200.0,450.0)
-      html.canvas2d.fillText("fps500: $fps500",200.0,500.0)
-      html.canvas2d.fillText(Gen.date(),200.0,550.0)
-      html.canvas2d.fillText(ServerCommon.test(),200.0,600.0)
+      html.canvas2d.fillText(Gen.date(),200.0,500.0)
+      html.canvas2d.fillText("realtimeTick: " + model?.realtimeTick,200.0,550.0)
+      html.canvas2d.fillText("serverTime: " + model?.client?.serverTime?.s,200.0,600.0)
+      html.canvas2d.fillText("smartPingDelay: " + model?.client?.smartPingDelay,200.0,650.0)
+
+
     }
     gl.clearColor(0f,0f,0f,1f)
     gl.clear(WGL.COLOR_BUFFER_BIT)
@@ -263,7 +267,7 @@ void main(void) {
           val fan = CircleData(defaultBlend) {angle-> floatArrayOf(/*it.x,it.y*/)}
           val strip = CircleData(stripBlend) {angle-> floatArrayOf(/*it.x,it.y*/)}
           if(state != null) {//todo redundant state!=null
-            val (x,y) = model.calcRenderXY(state,XY(it.x,it.y),cameraGamePos)
+            val (x,y) = calcRenderXY(state,XY(it.x,it.y),cameraGamePos)
             renderCircle10(x.toFloat(), y.toFloat(), it.gameSize, glTexture,fan,strip, 0.75f)
           }
         }
