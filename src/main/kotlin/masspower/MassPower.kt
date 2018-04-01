@@ -15,7 +15,7 @@ import org.khronos.webgl.WebGLRenderingContext as WGL
 
 const val DYNAMIC_SHADER = false//default true +1 fps
 const val DYNAMIC_BLEND = true//не влияет на производительность
-const val TEXT = false
+const val TEXT = true
 
 data class ImgData(val url:String, val width:Int, val height:Int = width)
 class ImgCache(var texture:MassPower.GameTexture? = null)
@@ -76,10 +76,7 @@ void main(void) {
   }
 """
   val textureShader:ShaderFull = ShaderFull(
-    ShaderVertex(
-      vertex,
-      listOf(/*Attr("a_center_pos",2),*/ Attr("a_center_x",1),Attr("a_center_y",1),Attr("a_angle",1),Attr("a_game_radius",1),Attr("a_relative_radius",1))
-    ),
+    ShaderVertex(vertex,listOf(/*Attr("a_center_pos",2),*/ Attr("a_center_x",1),Attr("a_center_y",1),Attr("a_angle",1),Attr("a_game_radius",1),Attr("a_relative_radius",1))),
 //language=GLSL
 """
 precision mediump float;
@@ -192,18 +189,17 @@ void main(void) {
     previousTime = time
     if(false) resize()
     if(TEXT) {
+      val lines:MutableList<String> = mutableListOf()
+      lines.add("mouse: ${mousePos}")
+      lines.add("fps30: $fps30")
+      lines.add(Gen.date())
+      lines.add("realtimeTick: " + model?.realtimeTick)
+      lines.add("serverTime: " + model?.client?.serverTime?.s)
+      lines.add("smartPingDelay: " + model?.client?.smartPingDelay)
       html.canvas2d.clearRect(0.0,0.0,view.gameWidth.toDouble(),view.gameHeight.toDouble())//todo why gameWidth?
       html.canvas2d.fillStyle = "white"
       html.canvas2d.font = "bold 24pt Arial"
-      //todo сделать без экранных координат
-      html.canvas2d.fillText("mouse: ${mousePos}",200.0,400.0)//todo протестировать производительность за пределами области рисования
-      html.canvas2d.fillText("fps30: $fps30",200.0,450.0)
-      html.canvas2d.fillText(Gen.date(),200.0,500.0)
-      html.canvas2d.fillText("realtimeTick: " + model?.realtimeTick,200.0,550.0)
-      html.canvas2d.fillText("serverTime: " + model?.client?.serverTime?.s,200.0,600.0)
-      html.canvas2d.fillText("smartPingDelay: " + model?.client?.smartPingDelay,200.0,650.0)
-
-
+      for(i in 0 until lines.size) html.canvas2d.fillText(lines[i],200.0,400.0+50*i)
     }
     gl.clearColor(0f,0f,0f,1f)
     gl.clear(WGL.COLOR_BUFFER_BIT)
