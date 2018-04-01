@@ -12,7 +12,6 @@ import kotlin.browser.*
 import kotlin.js.*
 import org.khronos.webgl.WebGLRenderingContext as WGL
 
-const val DYNAMIC_SHADER = false//default true +1 fps
 const val DYNAMIC_BLEND = true//не влияет на производительность
 const val TEXT = true
 
@@ -48,8 +47,8 @@ class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 widt
 //language=GLSL
   val vertex = """
 //Если атрибут в шейдере не используется, то при компиляции он будет вырезан, и могут возникнуть ошибки "enableVertexAttribArray: index out of range"
-//attribute vec2 a_center_pos;//игровые координаты центра круга //todo позиция атрибутов //попробовать lowp
-attribute float a_center_x;
+//attribute vec2 a_center_pos; //todo позиция атрибутов //попробовать lowp
+attribute float a_center_x;//игровые координаты центра круга
 attribute float a_center_y;
 attribute float a_angle;
 attribute float a_game_radius;//Радиус объекта в игровых координатах. Всегда одинаковый для одного объекта.//так быстрее (+2fps), чем через uniform float u_game_radius;
@@ -96,7 +95,7 @@ void main(void) {
 """
 precision mediump float;
 void main(void) {
-  gl_FragColor = vec4(0.3,0.3,0.3,0.4);
+  gl_FragColor = vec4(0.5,0.6,0.7,1.0);
 }
 """)
   val backgroundShader = ShaderFull(ShaderVertex(shader_mesh_default_vert, listOf(Attr("aVertexPosition",2))), shader_background_stars_frag)
@@ -114,10 +113,6 @@ void main(void) {
     window.requestAnimationFrame {
       backgroundShader.activate()
       textureShader.activate()
-      if(false) setUniform1i("u_sampler", 0)
-
-      colorShader.activate()
-
       gl.enable(WGL.BLEND)
       if(!DYNAMIC_BLEND) gl.blendFunc(defaultBlend.src.value,defaultBlend.dst.value)
       gameLoop(it)
@@ -214,7 +209,7 @@ void main(void) {
     colorShader.activate()
     state?.reactive?.forEach {
       val fan = CircleData(defaultBlend){angle-> floatArrayOf(/*it.pos.x.toFloat(),it.pos.y.toFloat()*/)}
-      renderCircle10(it.pos.x.toFloat(), it.pos.y.toFloat(), it.radius*1.8f, null,fan)
+      renderCircle10(it.pos.x.toFloat(), it.pos.y.toFloat(), it.radius*3.8f, null,fan)
     }
     textureShader.activate()
     mutableListOf<RenderData>().apply {
@@ -378,10 +373,9 @@ void main(void) {
       2 -> gl.uniform2f(uniformLocation,values[0], values[1])
     }
   }
-  fun setUniform1i(s:String,i:Int) {TODO("setUniform1i")}
   inner class ShaderVertex(val src:String, val attrList:List<Attr>)
   inner class ShaderFull(val vert:ShaderVertex, frag:String) {
-    val shaderProgram = gl.createWebGLProgram(vert.src,frag)
+    val shaderProgram = gl.createWebGLProgram(vert.src,frag)//todo test performance с одной текстурой атласом
     val attributes = vert.attrList.run {
       val result = mutableListOf<IterAttr>()
       var currentSize = 0
