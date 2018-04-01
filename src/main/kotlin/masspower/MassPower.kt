@@ -203,7 +203,6 @@ void main(void) {
     }
     gl.clearColor(0f,0f,0f,1f)
     gl.clear(WGL.COLOR_BUFFER_BIT)
-
     val state = model?.calcDisplayState()
     currentGameScale+=(targetGameScale - currentGameScale)/30
     setUniformf("u_game_width", view.gameWidth)
@@ -214,9 +213,7 @@ void main(void) {
     render(Mode.TRIANGLE,-1f,-1f,-1f,1f,1f,-1f,1f,1f,-1f,1f,1f,-1f)
     colorShader.activate()
     state?.reactive?.forEach {
-      val fan = CircleData(defaultBlend){angle->
-        floatArrayOf(/*it.pos.x.toFloat(),it.pos.y.toFloat()*/)
-      }
+      val fan = CircleData(defaultBlend){angle-> floatArrayOf(/*it.pos.x.toFloat(),it.pos.y.toFloat()*/)}
       renderCircle10(it.pos.x.toFloat(), it.pos.y.toFloat(), it.radius*1.3f, null,fan)
     }
     textureShader.activate()
@@ -264,9 +261,7 @@ void main(void) {
         }
         cache.texture?.apply {
           val fan = CircleData(defaultBlend) {angle-> floatArrayOf(/*it.x,it.y*/)}
-          val strip = CircleData(stripBlend) {angle->
-            floatArrayOf(/*it.x,it.y*/)
-          }
+          val strip = CircleData(stripBlend) {angle-> floatArrayOf(/*it.x,it.y*/)}
           if(state != null) {//todo redundant state!=null
             val (x,y) = model.calcRenderXY(state,XY(it.x,it.y),cameraGamePos)
             renderCircle10(x.toFloat(), y.toFloat(), it.gameSize, glTexture,fan,strip, 0.75f)
@@ -371,7 +366,7 @@ void main(void) {
 
   lateinit var currentShader:ShaderFull
   val uniforms:MutableMap<String, FloatArray> = mutableMapOf()
-  fun setUniformf(name:String, vararg values:Float) {//todo vararg and int
+  fun setUniformf(name:String, vararg values:Float) {
     uniforms[name] = values
     _setUniform(name, values)
   }
