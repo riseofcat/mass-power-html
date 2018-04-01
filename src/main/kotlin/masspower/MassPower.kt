@@ -15,6 +15,7 @@ import org.khronos.webgl.WebGLRenderingContext as WGL
 
 const val DYNAMIC_SHADER = false//default true +1 fps
 const val DYNAMIC_BLEND = true//не влияет на производительность
+const val TEXT = false
 
 data class ImgData(val url:String, val width:Int, val height:Int = width)
 class ImgCache(var texture:MassPower.GameTexture? = null)
@@ -40,12 +41,9 @@ class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 widt
   val View.borderLeft get() = (window.innerWidth-windowWidth)/2
   val View.borderTop get() = (window.innerHeight-windowHeight)/2
 
-  val gameScale:Float get(){
-    currentGameScale+=(targetGameScale - currentGameScale)/100
-    return currentGameScale
-  }
+  val gameScale:Float get() = currentGameScale
   var currentGameScale = 1f
-  val targetGameScale get() = model.myCar?.run {1f + 3 * lib.Fun.arg0toInf(speed.len, 1000.0).toFloat()}?:1f//todo size //todo hardcode 1000f middle speed
+  val targetGameScale get() = model.myCar?.run {1f + 3 * lib.Fun.arg0toInf(speed.len, 1000.0).toFloat()}?:1f//todo car size
   val html = HTMLElements()
   val gl get() = html.webgl
 //language=GLSL
@@ -186,35 +184,34 @@ void main(void) {
   val colors = listOf(imgRed,imgGreen,imgBlue,imgYellow,imgViolet)
   val PlayerId.color get() = colors.let {it[id%it.size]}
   var cameraGamePos = XY(0f,0f)
+  var backgroundOffset = XY()
 
   private fun gameLoop(милисекундСоСтараПлюсБездействие:Double):Unit = lib.saveInvoke {
     fps30 = (fps30*30+1f/(time-previousTime)).toFloat()/(30+1)
     fps500 = (fps500*200+1f/(time-previousTime)).toFloat()/(200+1)
     previousTime = time
     if(false) resize()
-    html.canvas2d.clearRect(0.0,0.0,view.gameWidth.toDouble(),view.gameHeight.toDouble())//todo why gameWidth?
-    html.canvas2d.fillStyle = "white"
-    html.canvas2d.font = "bold 24pt Arial"
-    html.canvas2d.fillText("mouse: ${mousePos}",200.0,400.0)//todo протестировать производительность за пределами области рисования
-    html.canvas2d.fillText("fps30: $fps30",200.0,450.0)
-    html.canvas2d.fillText("fps500: $fps500",200.0,500.0)
-    html.canvas2d.fillText(Gen.date(),200.0,550.0)
-    html.canvas2d.fillText(ServerCommon.test(),200.0,600.0)
+    if(TEXT) {
+      html.canvas2d.clearRect(0.0,0.0,view.gameWidth.toDouble(),view.gameHeight.toDouble())//todo why gameWidth?
+      html.canvas2d.fillStyle = "white"
+      html.canvas2d.font = "bold 24pt Arial"
+      html.canvas2d.fillText("mouse: ${mousePos}",200.0,400.0)//todo протестировать производительность за пределами области рисования
+      html.canvas2d.fillText("fps30: $fps30",200.0,450.0)
+      html.canvas2d.fillText("fps500: $fps500",200.0,500.0)
+      html.canvas2d.fillText(Gen.date(),200.0,550.0)
+      html.canvas2d.fillText(ServerCommon.test(),200.0,600.0)
+    }
     gl.clearColor(0f,0f,0f,1f)
     gl.clear(WGL.COLOR_BUFFER_BIT)
+
     val state = model?.calcDisplayState()
-
-    setUniform1f("u_game_width", view.gameWidth)
-    setUniform1f("u_game_height", view.gameHeight)
-
+    currentGameScale+=(targetGameScale - currentGameScale)/30
+    setUniformf("u_game_width", view.gameWidth)
+    setUniformf("u_game_height", view.gameHeight)
+    setUniformf("resolution", view.windowWidth, view.windowHeight)
     backgroundShader.activate()
-//      gl.uniform1f(gl.getUniformLocation(backgroundShader,"resolution"),width,height)
-    setUniform1f("time", lib.pillarTimeS(10_000f).toFloat())
-//      gl.uniform1f(gl.getUniformLocation(backgroundShader,"mouse"),backgroundOffset.xf,backgroundOffset.yf)
-    render(Mode.TRIANGLE,
-      -1f,-1f,  -1f,1f,  1f,-1f,
-      1f,1f,  -1f,1f,  1f,-1f)
-
+    setUniformf("time", lib.pillarTimeS(10_000f).toFloat())
+    render(Mode.TRIANGLE,-1f,-1f,-1f,1f,1f,-1f,1f,1f,-1f,1f,1f,-1f)
     colorShader.activate()
     state?.reactive?.forEach {
       val fan = CircleData(defaultBlend){angle->
@@ -222,7 +219,6 @@ void main(void) {
       }
       renderCircle10(it.pos.x.toFloat(), it.pos.y.toFloat(), it.radius*1.3f, null,fan)
     }
-
     textureShader.activate()
     mutableListOf<RenderData>().apply {
       if(state != null) {
@@ -230,9 +226,17 @@ void main(void) {
         if(true) state.reactive.forEach {add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),it.radius,it.owner.color))}
         state.cars.forEach {
           if(it.owner == model?.welcome?.id) {
+            val prev = cameraGamePos
             cameraGamePos = it.pos.copy()
-            setUniform1f("u_game_camera_x", it.pos.x.toFloat())
-            setUniform1f("u_game_camera_y", it.pos.y.toFloat())
+            val change = cameraGamePos - prev
+            if(change.x>state.width/2) change.x = change.x-state.width
+            else if(change.x<-state.width/2) change.x = change.x+state.width
+            if(change.y>state.height/2) change.y = change.y-state.height
+            else if(change.y<-state.height/2) change.y = change.y+state.height
+            backgroundOffset += change*0.0001
+            setUniformf("mouse", backgroundOffset.x.toFloat(), backgroundOffset.y.toFloat())
+            setUniformf("u_game_camera_x", it.pos.x.toFloat())
+            setUniformf("u_game_camera_y", it.pos.y.toFloat())
           }
           add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),it.radius,it.owner.color))
         }
@@ -366,10 +370,17 @@ void main(void) {
   }
 
   lateinit var currentShader:ShaderFull
-  val uniforms:MutableMap<String, Float> = mutableMapOf()
-  fun setUniform1f(name:String, value:Float) {//todo vararg and int
-    uniforms[name] = value
-    gl.uniform1f(gl.getUniformLocation(currentShader.shaderProgram,name),value)
+  val uniforms:MutableMap<String, FloatArray> = mutableMapOf()
+  fun setUniformf(name:String, vararg values:Float) {//todo vararg and int
+    uniforms[name] = values
+    _setUniform(name, values)
+  }
+  fun _setUniform(name:String, values:FloatArray) {
+    val uniformLocation = gl.getUniformLocation(currentShader.shaderProgram,name)
+    when(values.size) {
+      1 -> gl.uniform1f(uniformLocation,values[0])
+      2 -> gl.uniform2f(uniformLocation,values[0], values[1])
+    }
   }
   fun setUniform1i(s:String,i:Int) {TODO("setUniform1i")}
   inner class ShaderVertex(val src:String, val attrList:List<Attr>)
@@ -390,7 +401,7 @@ void main(void) {
       currentShader = this
       gl.bindBuffer(WGL.ARRAY_BUFFER,buffer)
       gl.useProgram(shaderProgram)
-      uniforms.entries.forEach {(k,v)-> gl.uniform1f(gl.getUniformLocation(currentShader.shaderProgram,k),v)}//todo optimize
+      uniforms.entries.forEach {(k,v)-> _setUniform(k,v)}//todo optimize _setUniform
       attributes.forEach {
         gl.enableVertexAttribArray(it.location)
         gl.vertexAttribPointer(it.location,it.attr.numElements,WGL.FLOAT,false,/*шаг*/blockSize*4,it.offset*4)
