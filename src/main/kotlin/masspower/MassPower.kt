@@ -22,13 +22,6 @@ data class RenderData(val x:Float,val y:Float,val gameSize:Float,val imgData:Img
 abstract class View {
   abstract fun getWidth(aspectRation:Float):Float
   abstract fun getHeight(aspectRation:Float):Float
-  val gameWidth:Float get() = getWidth(window.innerWidth/window.innerHeight.toFloat())
-  val gameHeight:Float get() = getHeight(window.innerWidth/window.innerHeight.toFloat())
-
-  val windowWidth get() = window.innerWidth.min(window.innerHeight*gameWidth/gameHeight)
-  val windowHeight get() = window.innerHeight.min(window.innerWidth*gameHeight/gameWidth)
-  val borderLeft get() = (window.innerWidth-windowWidth)/2
-  val borderTop get() = (window.innerHeight-windowHeight)/2
 }
 
 class FixedWidth(val width:Float,val minHeight:Float,val maxHeight:Float):View() {
@@ -39,10 +32,20 @@ class FixedWidth(val width:Float,val minHeight:Float,val maxHeight:Float):View()
 data class Attr(val locationName:String,val numElements:Int)
 data class IterAttr(val attr:Attr,val location:Int,val offset:Int)
 
-class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 width
+class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 width   //todo высчитывать исходя из радиуса обзора
+  val View.gameWidth:Float get() = getWidth(window.innerWidth/window.innerHeight.toFloat())*gameScale
+  val View.gameHeight:Float get() = getHeight(window.innerWidth/window.innerHeight.toFloat())*gameScale
+  val View.windowWidth get() = window.innerWidth.min(window.innerHeight*gameWidth/gameHeight)
+  val View.windowHeight get() = window.innerHeight.min(window.innerWidth*gameHeight/gameWidth)
+  val View.borderLeft get() = (window.innerWidth-windowWidth)/2
+  val View.borderTop get() = (window.innerHeight-windowHeight)/2
 
-  val gameScale:Float = 1.0f
-  val RenderData.scale:Float get() = gameScale * gameSize/imgData.width
+  val gameScale:Float get(){
+    currentGameScale+=(targetGameScale - currentGameScale)/100
+    return currentGameScale
+  }
+  var currentGameScale = 1f
+  val targetGameScale get() = model.myCar?.run {1f + 3 * lib.Fun.arg0toInf(speed.len, 1000.0).toFloat()}?:1f//todo size //todo hardcode 1000f middle speed
   val html = HTMLElements()
   val gl get() = html.webgl
 //language=GLSL
@@ -118,8 +121,6 @@ void main(void) {
       backgroundShader.activate()
       textureShader.activate()
       if(false) setUniform1i("u_sampler", 0)
-      setUniform1f("u_game_width", view.gameWidth)
-      setUniform1f("u_game_height", view.gameHeight)
 
       colorShader.activate()
 
@@ -191,7 +192,7 @@ void main(void) {
     fps500 = (fps500*200+1f/(time-previousTime)).toFloat()/(200+1)
     previousTime = time
     if(false) resize()
-    html.canvas2d.clearRect(0.0,0.0,view.gameWidth.toDouble(),view.gameHeight.toDouble())
+    html.canvas2d.clearRect(0.0,0.0,view.gameWidth.toDouble(),view.gameHeight.toDouble())//todo why gameWidth?
     html.canvas2d.fillStyle = "white"
     html.canvas2d.font = "bold 24pt Arial"
     html.canvas2d.fillText("mouse: ${mousePos}",200.0,400.0)//todo протестировать производительность за пределами области рисования
@@ -202,6 +203,9 @@ void main(void) {
     gl.clearColor(0f,0f,0f,1f)
     gl.clear(WGL.COLOR_BUFFER_BIT)
     val state = model?.calcDisplayState()
+
+    setUniform1f("u_game_width", view.gameWidth)
+    setUniform1f("u_game_height", view.gameHeight)
 
     backgroundShader.activate()
 //      gl.uniform1f(gl.getUniformLocation(backgroundShader,"resolution"),width,height)
