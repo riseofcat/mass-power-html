@@ -390,7 +390,8 @@ void main(void) {
       uniforms.entries.forEach {(k,v)-> _setUniform(k,v)}//todo optimize _setUniform
       attributes.forEach {
         gl.enableVertexAttribArray(it.location)
-        gl.vertexAttribPointer(it.location,it.attr.numElements,WGL.FLOAT,false,/*шаг*/blockSize*4,it.offset*4)
+        val BYTES = Float32Array.BYTES_PER_ELEMENT//4
+        gl.vertexAttribPointer(it.location,it.attr.numElements,WGL.FLOAT,false,/*шаг*/blockSize*BYTES,it.offset*BYTES)
         if(false) gl.disableVertexAttribArray(it.location)//Если нужно после рендера отключить эти атрибуты (вероятно чтобы иметь возможность задать новые атрибуты для другого шейдера)
       }
     }
