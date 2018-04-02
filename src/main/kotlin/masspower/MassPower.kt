@@ -42,12 +42,12 @@ class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 widt
   val gl get() = html.webgl
 //language=GLSL
   val vertex = """
-//todo оптимизировать шейдеры lowp
 //Если атрибут в шейдере не используется, то при компиляции он будет вырезан, и могут возникнуть ошибки "enableVertexAttribArray: index out of range"
 attribute float a_center_x;//игровые координаты центра круга
 attribute float a_center_y;
 attribute float a_angle;
 attribute float a_game_radius;//Радиус объекта в игровых координатах. Всегда одинаковый для одного объекта.//так быстрее (+2fps), чем через uniform float u_game_radius;
+
 attribute float a_relative_radius;//относительный радиус от [0 до 1] внутри круга и от (1 до inf) вне круга
 
 uniform float u_game_width;
@@ -55,8 +55,8 @@ uniform float u_game_height;
 uniform float u_game_camera_x;
 uniform float u_game_camera_y;
 
-varying vec2 v_textCoord;
-varying float v_distance;//расстояние до круга относительно a_relative_radius. Если 0 то - в круге , если > 0 то точка на растоянии a_relative_radius * v_distance от края круга
+varying lowp vec2 v_textCoord;
+varying lowp float v_distance;//расстояние до круга относительно a_relative_radius. Если 0 то - в круге , если > 0 то точка на растоянии a_relative_radius * v_distance от края круга
 
 void main(void) {
   v_distance = max(a_relative_radius - 1.0, 0.0);
@@ -73,10 +73,10 @@ void main(void) {
     ShaderVertex(vertex,listOf(/*Attr("a_center_pos",2),*/ Attr("a_center_x",1),Attr("a_center_y",1),Attr("a_angle",1),Attr("a_game_radius",1),Attr("a_relative_radius",1))),
 //language=GLSL
 """
-precision mediump float;
+precision mediump float;//todo lowp
 uniform sampler2D u_sampler;
-varying vec2 v_textCoord;
-varying float v_distance;
+varying lowp vec2 v_textCoord;
+varying lowp float v_distance;//todo разобраться с invariant
 void main(void) {
   gl_FragColor = texture2D(u_sampler, v_textCoord);
   gl_FragColor.a = gl_FragColor.a / pow(1.0 + v_distance, 6.0);//todo потестировать performance pow() vs деление много раз
@@ -204,8 +204,8 @@ void main(void) {
     render(Mode.TRIANGLE,-1f,-1f,-1f,1f,1f,-1f,1f,1f,-1f,1f,1f,-1f)
     colorShader.activate()
     state?.reactive?.forEach {
-      val fan = CircleData(defaultBlend){angle-> floatArrayOf(/*it.pos.x.toFloat(),it.pos.y.toFloat()*/)}
-      renderCircle10(it.pos.x.toFloat(), it.pos.y.toFloat(), it.radius*3.8f, null,fan)
+      val fan = CircleData(defaultBlend){angle-> floatArrayOf(1f)}
+      renderCircle10(it.pos.x.toFloat(), it.pos.y.toFloat(), it.radius*3.8f, null,floatArrayOf(0f),fan)
     }
     textureShader.activate()
     mutableListOf<RenderData>().apply {
@@ -252,11 +252,11 @@ void main(void) {
           img.src = it.imgData.url
         }
         cache.texture?.apply {
-          val fan = CircleData(defaultBlend) {angle-> floatArrayOf(/*it.x,it.y*/)}
-          val strip = CircleData(stripBlend) {angle-> floatArrayOf(/*it.x,it.y*/)}
+          val fan = CircleData(defaultBlend) {angle-> floatArrayOf(1f)}
+          val strip = CircleData(stripBlend) {angle-> floatArrayOf(1.75f)}
           if(state != null) {//todo redundant state!=null
             val (x,y) = calcRenderXY(state,XY(it.x,it.y),cameraGamePos)
-            renderCircle10(x.toFloat(), y.toFloat(), it.gameSize, glTexture,fan,strip, 0.75f)
+            renderCircle10(x.toFloat(), y.toFloat(), it.gameSize, glTexture,floatArrayOf(0f),fan,strip)
           }
         }
       }
@@ -279,15 +279,12 @@ void main(void) {
 
   fun angle(i:Int,max:Int) = 2*kotlin.math.PI.toFloat()*i/max
   val radian10 = (0..9).toList().map {angle(it,10)}.toFloatArray()//todo попробовать закэшировать значения радиан в шейдерах (на лету генерить string шейдера) и передавать индексы
-  fun renderCircle10(gameX:Float, gameY:Float, gameRadius:Float, texture:WebGLTexture?, fan:CircleData, strip:CircleData? = null, stripRelativeDistance:Float = 0.75f) {//noinline better performance
+  fun renderCircle10(gameX:Float, gameY:Float, gameRadius:Float, texture:WebGLTexture?, center:FloatArray, fan:CircleData, strip:CircleData? = null) {//noinline better performance
     if(texture != null) gl.bindTexture(WGL.TEXTURE_2D,texture)//-2fps
     val x = gameX
     val y = gameY
     val notUsed = 0f
     val gr = gameRadius
-    val r1 = 1f//Радиус 1f - окружность
-    val r0 = 0f//центр круга
-    val center = fan.getArr(0f)
     val f0 = fan.getArr(radian10[0])
     val f1 = fan.getArr(radian10[1])
     val f2 = fan.getArr(radian10[2])
@@ -300,18 +297,18 @@ void main(void) {
     val f9 = fan.getArr(radian10[9])
     if(DYNAMIC_BLEND) gl.blendFunc(fan.blend.src.value,fan.blend.dst.value)
     render(Mode.TRIANGLE_FAN,
-      x,y,notUsed,gr,r0,*center,
-      x,y,radian10[0],gr,r1,*f0,
-      x,y,radian10[1],gr,r1,*f1,
-      x,y,radian10[2],gr,r1,*f2,
-      x,y,radian10[3],gr,r1,*f3,
-      x,y,radian10[4],gr,r1,*f4,
-      x,y,radian10[5],gr,r1,*f5,
-      x,y,radian10[6],gr,r1,*f6,
-      x,y,radian10[7],gr,r1,*f7,
-      x,y,radian10[8],gr,r1,*f8,
-      x,y,radian10[9],gr,r1,*f9,
-      x,y,radian10[0],gr,r1,*f0
+      x,y,notUsed,gr,*center,
+      x,y,radian10[0],gr,*f0,
+      x,y,radian10[1],gr,*f1,
+      x,y,radian10[2],gr,*f2,
+      x,y,radian10[3],gr,*f3,
+      x,y,radian10[4],gr,*f4,
+      x,y,radian10[5],gr,*f5,
+      x,y,radian10[6],gr,*f6,
+      x,y,radian10[7],gr,*f7,
+      x,y,radian10[8],gr,*f8,
+      x,y,radian10[9],gr,*f9,
+      x,y,radian10[0],gr,*f0
     )
     if(strip != null) {
       val s0 = strip.getArr(radian10[0])
@@ -325,19 +322,18 @@ void main(void) {
       val s8 = strip.getArr(radian10[8])
       val s9 = strip.getArr(radian10[9])
       if(DYNAMIC_BLEND) gl.blendFunc(strip.blend.src.value,strip.blend.dst.value)
-      val rs = 1.0f + stripRelativeDistance//за кругом glow radius
       render(Mode.TRIANGLE_STRIP,
-        x,y,radian10[0],gr,r1,*f0,x,y,radian10[0],gr,rs,*s0,
-        x,y,radian10[1],gr,r1,*f1,x,y,radian10[1],gr,rs,*s1,
-        x,y,radian10[2],gr,r1,*f2,x,y,radian10[2],gr,rs,*s2,
-        x,y,radian10[3],gr,r1,*f3,x,y,radian10[3],gr,rs,*s3,
-        x,y,radian10[4],gr,r1,*f4,x,y,radian10[4],gr,rs,*s4,
-        x,y,radian10[5],gr,r1,*f5,x,y,radian10[5],gr,rs,*s5,
-        x,y,radian10[6],gr,r1,*f6,x,y,radian10[6],gr,rs,*s6,
-        x,y,radian10[7],gr,r1,*f7,x,y,radian10[7],gr,rs,*s7,
-        x,y,radian10[8],gr,r1,*f8,x,y,radian10[8],gr,rs,*s8,
-        x,y,radian10[9],gr,r1,*f9,x,y,radian10[9],gr,rs,*s9,
-        x,y,radian10[0],gr,r1,*f0,x,y,radian10[0],gr,rs,*s0
+        x,y,radian10[0],gr,*f0,x,y,radian10[0],gr,*s0,
+        x,y,radian10[1],gr,*f1,x,y,radian10[1],gr,*s1,
+        x,y,radian10[2],gr,*f2,x,y,radian10[2],gr,*s2,
+        x,y,radian10[3],gr,*f3,x,y,radian10[3],gr,*s3,
+        x,y,radian10[4],gr,*f4,x,y,radian10[4],gr,*s4,
+        x,y,radian10[5],gr,*f5,x,y,radian10[5],gr,*s5,
+        x,y,radian10[6],gr,*f6,x,y,radian10[6],gr,*s6,
+        x,y,radian10[7],gr,*f7,x,y,radian10[7],gr,*s7,
+        x,y,radian10[8],gr,*f8,x,y,radian10[8],gr,*s8,
+        x,y,radian10[9],gr,*f9,x,y,radian10[9],gr,*s9,
+        x,y,radian10[0],gr,*f0,x,y,radian10[0],gr,*s0
       )
     }
   }
