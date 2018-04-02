@@ -12,6 +12,7 @@ import kotlin.browser.*
 import kotlin.js.*
 import org.khronos.webgl.WebGLRenderingContext as WGL
 
+const val FOOD_SCALE = 3f
 const val DYNAMIC_BLEND = true//не влияет на производительность
 const val TEXT = true
 data class ImgData(val url:String)
@@ -46,7 +47,7 @@ class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 widt
 attribute float a_center_x;//игровые координаты центра круга
 attribute float a_center_y;
 attribute float a_angle;
-attribute float a_game_radius;//Радиус объекта в игровых координатах. Всегда одинаковый для одного объекта.//так быстрее (+2fps), чем через uniform float u_game_radius;
+attribute float a_game_radius;//Радиус точки от центра в игровых координатах.
 
 attribute float a_relative_radius;//относительный радиус от [0 до 1] внутри круга и от (1 до inf) вне круга
 
@@ -62,10 +63,9 @@ void main(void) {
   v_distance = max(a_relative_radius - 1.0, 0.0);
   //сейчас из png вырезается элипс, а ещё можно попробовать натягивать прямоугольник, чтобы попадали уголки png
   v_textCoord = vec2(0.5, 0.5) + vec2(cos(a_angle), sin(a_angle)) * 0.5 * min(a_relative_radius, 1.0);
-  float currentRadius = a_relative_radius*a_game_radius;
   mat2 screenScale = mat2(2.0/u_game_width,       0.0,
                                 0.0,       2.0/u_game_height);
-  vec2 gamePos = /*a_center_pos*/vec2(a_center_x, a_center_y) + vec2(cos(a_angle)*currentRadius, sin(a_angle)*currentRadius);
+  vec2 gamePos = /*a_center_pos*/vec2(a_center_x, a_center_y) + vec2(cos(a_angle)*a_game_radius, sin(a_angle)*a_game_radius);
   gl_Position = vec4(screenScale*(gamePos - vec2(u_game_camera_x, u_game_camera_y)), 1.0, 1.0);
   }
 """
@@ -82,23 +82,52 @@ void main(void) {
   gl_FragColor.a = gl_FragColor.a / pow(1.0 + v_distance, 6.0);//todo потестировать performance pow() vs деление много раз
 }
 """)
-  val colorShader:ShaderFull = ShaderFull(
+
+  val foodShader:ShaderFull = ShaderFull(
     ShaderVertex(
-      vertex,
-      listOf(/*Attr("a_center_pos",2),*/ Attr("a_center_x",1),Attr("a_center_y",1), Attr("a_angle",1), Attr("a_game_radius",1), Attr("a_relative_radius",1))
+//language=GLSL
+"""
+//Если атрибут в шейдере не используется, то при компиляции он будет вырезан, и могут возникнуть ошибки "enableVertexAttribArray: index out of range"
+attribute float a_center_x;//игровые координаты центра круга
+attribute float a_center_y;
+attribute float a_angle;
+attribute float a_game_radius;
+
+attribute lowp vec4 a_color;
+
+uniform mediump float time;
+uniform float u_game_width;
+uniform float u_game_height;
+uniform float u_game_camera_x;
+uniform float u_game_camera_y;
+
+varying lowp vec4 v_color;
+
+void main(void) {
+  v_color = a_color + vec4(cos(a_angle + time), cos(a_angle + time + radians(120.0)), cos(a_angle + time + radians(240.0)), 0.0)*(sign(a_game_radius)+0.3);
+  v_color = v_color - (1.0 - sign(a_game_radius))*cos(time)*vec4(1.0,1.0,1.0,0.4);
+  //сейчас из png вырезается элипс, а ещё можно попробовать натягивать прямоугольник, чтобы попадали уголки png
+  mat2 screenScale = mat2(2.0/u_game_width,       0.0,
+                                0.0,       2.0/u_game_height);
+  vec2 gamePos = /*a_center_pos*/vec2(a_center_x, a_center_y) + vec2(cos(a_angle)*a_game_radius, sin(a_angle)*a_game_radius);
+  gl_Position = vec4(screenScale*(gamePos - vec2(u_game_camera_x, u_game_camera_y)), 1.0, 1.0);
+  }
+""",
+      listOf(/*Attr("a_center_pos",2),*/ Attr("a_center_x",1),Attr("a_center_y",1), Attr("a_angle",1), Attr("a_game_radius",1), Attr("a_color",4))
     ),
 //language=GLSL
 """
 precision mediump float;
+varying lowp vec4 v_color;
 void main(void) {
-  gl_FragColor = vec4(0.5,0.6,0.7,1.0);
+  gl_FragColor = v_color;
 }
 """)
   val backgroundShader = ShaderFull(ShaderVertex(shader_mesh_default_vert, listOf(Attr("aVertexPosition",2))), shader_background_stars_frag)
   private val imgCache:MutableMap<ImgData,ImgCache> = hashMapOf()
   var mousePos:XY = XY()
-//  var model:ClientModel = ClientModel(Conf(5000, "localhost"))
-  val model:ClientModel? = ClientModel(Conf(5000, "192.168.100.7"))
+  var model:ClientModel = ClientModel(Conf(5000, "localhost"))
+//  val model:ClientModel? = ClientModel(Conf(5000, "192.168.100.7"))
 //  val model:ClientModel? = ClientModel(Conf(80, "mass-power.herokuapp.com"))
 
   init {
@@ -200,17 +229,18 @@ void main(void) {
     setUniformf("u_game_height", view.gameHeight)
     setUniformf("resolution", view.windowWidth, view.windowHeight)
     backgroundShader.activate()
-    setUniformf("time", 2f - lib.pillarTimeS(4f).toFloat())//lowp от -2.0 до 2.0
+    val pow2in14:Float = 1024f*2*2*2*2
+    setUniformf("time", pow2in14 - lib.pillarTimeS(2*pow2in14).toFloat())//lowp от -2.0 до 2.0
     render(Mode.TRIANGLE,-1f,-1f,-1f,1f,1f,-1f,1f,1f,-1f,1f,1f,-1f)
-    colorShader.activate()
-    state?.reactive?.forEach {
-      val fan = CircleData(defaultBlend){angle-> floatArrayOf(1f)}
-      renderCircle10(it.pos.x.toFloat(), it.pos.y.toFloat(), it.radius*3.8f, null,floatArrayOf(0f),fan)
+    foodShader.activate()
+    state?.foods?.forEach {
+      val fan = CircleData(defaultBlend){angle-> floatArrayOf(0f, 0f, 0f, 0f)}
+      val (x,y) = calcRenderXY(state,XY(it.pos.x,it.pos.y),cameraGamePos)
+      renderCircle10(x.toFloat(), y.toFloat(), it.radius*FOOD_SCALE, null,floatArrayOf(1.5f, 1.5f, 1.5f, 1f),fan)
     }
     textureShader.activate()
     mutableListOf<RenderData>().apply {
       if(state != null) {
-        state.foods.forEach {add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),it.radius,imgGray))}
         if(true) state.reactive.forEach {add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),it.radius,it.owner.color))}
         state.cars.forEach {
           if(it.owner == model?.welcome?.id) {
@@ -223,7 +253,7 @@ void main(void) {
             else if(change.y<-state.height/2) change.y = change.y+state.height
             backgroundOffset += change*0.0001
             setUniformf("mouse", backgroundOffset.x.toFloat(), backgroundOffset.y.toFloat())
-            setUniformf("u_game_camera_x", it.pos.x.toFloat())
+            setUniformf("u_game_camera_x", it.pos.x.toFloat())//todo вынести до начала любого рендеринга
             setUniformf("u_game_camera_y", it.pos.y.toFloat())
           }
           add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),it.radius,it.owner.color))
@@ -279,11 +309,12 @@ void main(void) {
 
   fun angle(i:Int,max:Int) = 2*kotlin.math.PI.toFloat()*i/max
   val radian10 = (0..9).toList().map {angle(it,10)}.toFloatArray()//todo попробовать закэшировать значения радиан в шейдерах (на лету генерить string шейдера) и передавать индексы
-  fun renderCircle10(gameX:Float, gameY:Float, gameRadius:Float, texture:WebGLTexture?, center:FloatArray, fan:CircleData, strip:CircleData? = null) {//noinline better performance
+  fun renderCircle10(gameX:Float, gameY:Float, gameRadius:Float, texture:WebGLTexture?, center:FloatArray, fan:CircleData, strip:CircleData? = null, stripRelativeWidth:Float = 0.5f) {//noinline better performance
     if(texture != null) gl.bindTexture(WGL.TEXTURE_2D,texture)//-2fps
     val x = gameX
     val y = gameY
     val notUsed = 0f
+    val r0 = 0f
     val gr = gameRadius
     val f0 = fan.getArr(radian10[0])
     val f1 = fan.getArr(radian10[1])
@@ -297,7 +328,7 @@ void main(void) {
     val f9 = fan.getArr(radian10[9])
     if(DYNAMIC_BLEND) gl.blendFunc(fan.blend.src.value,fan.blend.dst.value)
     render(Mode.TRIANGLE_FAN,
-      x,y,notUsed,gr,*center,
+      x,y,notUsed,r0,*center,
       x,y,radian10[0],gr,*f0,
       x,y,radian10[1],gr,*f1,
       x,y,radian10[2],gr,*f2,
@@ -321,19 +352,20 @@ void main(void) {
       val s7 = strip.getArr(radian10[7])
       val s8 = strip.getArr(radian10[8])
       val s9 = strip.getArr(radian10[9])
+      val stripRadius = (1f+stripRelativeWidth)*gr
       if(DYNAMIC_BLEND) gl.blendFunc(strip.blend.src.value,strip.blend.dst.value)
       render(Mode.TRIANGLE_STRIP,
-        x,y,radian10[0],gr,*f0,x,y,radian10[0],gr,*s0,
-        x,y,radian10[1],gr,*f1,x,y,radian10[1],gr,*s1,
-        x,y,radian10[2],gr,*f2,x,y,radian10[2],gr,*s2,
-        x,y,radian10[3],gr,*f3,x,y,radian10[3],gr,*s3,
-        x,y,radian10[4],gr,*f4,x,y,radian10[4],gr,*s4,
-        x,y,radian10[5],gr,*f5,x,y,radian10[5],gr,*s5,
-        x,y,radian10[6],gr,*f6,x,y,radian10[6],gr,*s6,
-        x,y,radian10[7],gr,*f7,x,y,radian10[7],gr,*s7,
-        x,y,radian10[8],gr,*f8,x,y,radian10[8],gr,*s8,
-        x,y,radian10[9],gr,*f9,x,y,radian10[9],gr,*s9,
-        x,y,radian10[0],gr,*f0,x,y,radian10[0],gr,*s0
+        x,y,radian10[0],gr,*f0,x,y,radian10[0],stripRadius,*s0,
+        x,y,radian10[1],gr,*f1,x,y,radian10[1],stripRadius,*s1,
+        x,y,radian10[2],gr,*f2,x,y,radian10[2],stripRadius,*s2,
+        x,y,radian10[3],gr,*f3,x,y,radian10[3],stripRadius,*s3,
+        x,y,radian10[4],gr,*f4,x,y,radian10[4],stripRadius,*s4,
+        x,y,radian10[5],gr,*f5,x,y,radian10[5],stripRadius,*s5,
+        x,y,radian10[6],gr,*f6,x,y,radian10[6],stripRadius,*s6,
+        x,y,radian10[7],gr,*f7,x,y,radian10[7],stripRadius,*s7,
+        x,y,radian10[8],gr,*f8,x,y,radian10[8],stripRadius,*s8,
+        x,y,radian10[9],gr,*f9,x,y,radian10[9],stripRadius,*s9,
+        x,y,radian10[0],gr,*f0,x,y,radian10[0],stripRadius,*s0
       )
     }
   }
