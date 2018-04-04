@@ -12,7 +12,7 @@ import kotlin.browser.*
 import kotlin.js.*
 import org.khronos.webgl.WebGLRenderingContext as WGL
 
-const val FOOD_SCALE = 3f
+const val FOOD_SCALE = 1.3f
 const val DYNAMIC_BLEND = true//не влияет на производительность
 const val TEXT = true
 data class ImgData(val url:String)
@@ -104,7 +104,8 @@ uniform float u_game_camera_y;
 varying lowp vec4 v_color;
 
 void main(void) {
-  v_color = a_color + vec4(cos(a_angle + time), cos(a_angle + time + radians(120.0)), cos(a_angle + time + radians(240.0)), 0.0)*(sign(a_game_radius)+0.3);
+  float posDiff = a_center_x + a_center_y;
+  v_color = a_color + vec4(cos(1.0*posDiff + a_angle + time*1.5), cos(1.5*posDiff + a_angle + time*2.0 + radians(120.0)), cos(2.0*posDiff + a_angle + time*2.5 + radians(240.0)), 0.0)*(sign(2.0*posDiff + a_game_radius)+0.3);
   v_color = v_color - (1.0 - sign(a_game_radius))*cos(time)*vec4(1.0,1.0,1.0,0.4);
   //сейчас из png вырезается элипс, а ещё можно попробовать натягивать прямоугольник, чтобы попадали уголки png
   mat2 screenScale = mat2(2.0/u_game_width,       0.0,
@@ -128,6 +129,7 @@ void main(void) {
   var mousePos:XY = XY()
   var model:ClientModel = ClientModel(Conf(5000, "localhost"))
 //  val model:ClientModel? = ClientModel(Conf(5000, "192.168.100.7"))
+//  val model:ClientModel? = ClientModel(Conf(5000, "192.168.43.176"))
 //  val model:ClientModel? = ClientModel(Conf(80, "mass-power.herokuapp.com"))
 
   init {
@@ -216,6 +218,10 @@ void main(void) {
       lines.add("realtimeTick: " + model?.realtimeTick)
       lines.add("serverTime: " + model?.client?.serverTime?.s)
       lines.add("smartPingDelay: " + model?.client?.smartPingDelay)
+      if(false)lines.add("size: ${model?.calcDisplayState()?.size}")
+      if(false)lines.add("width: ${model?.calcDisplayState()?.width}")
+      if(false)lines.add("height: ${model?.calcDisplayState()?.height}")
+      if(false)lines.add("targetSize: ${model?.calcDisplayState()?.targetSize}")
       html.canvas2d.clearRect(0.0,0.0,view.gameWidth.toDouble(),view.gameHeight.toDouble())//todo why gameWidth?
       html.canvas2d.fillStyle = "white"
       html.canvas2d.font = "bold 24pt Arial"
@@ -234,9 +240,11 @@ void main(void) {
     render(Mode.TRIANGLE,-1f,-1f,-1f,1f,1f,-1f,1f,1f,-1f,1f,1f,-1f)
     foodShader.activate()
     state?.foods?.forEach {
-      val fan = CircleData(defaultBlend){angle-> floatArrayOf(0f, 0f, 0f, 0f)}
-      val (x,y) = calcRenderXY(state,XY(it.pos.x,it.pos.y),cameraGamePos)
-      renderCircle10(x.toFloat(), y.toFloat(), it.radius*FOOD_SCALE, null,floatArrayOf(1.5f, 1.5f, 1.5f, 1f),fan)
+      val xy = calcRenderXY(state,XY(it.pos.x,it.pos.y),cameraGamePos)
+      if((cameraGamePos - xy).len < 1000f) {//todo высчитывать радиус обзора и применять к cars и reactive
+        val fan = CircleData(defaultBlend){angle-> floatArrayOf(0f, 0f, 0f, 0f)}
+        renderCircle10(xy.x.toFloat(), xy.y.toFloat(), it.radius*FOOD_SCALE, null,floatArrayOf(1.5f, 1.5f, 1.5f, 1f),fan)
+      }
     }
     textureShader.activate()
     mutableListOf<RenderData>().apply {
@@ -259,9 +267,6 @@ void main(void) {
           add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),it.radius,it.owner.color))
         }
       }
-      add(RenderData(mousePos.x.toFloat(),mousePos.y.toFloat(),30f,imgViolet))
-      add(RenderData(mousePos.x.toFloat(),mousePos.y.toFloat(),30f,imgBig))
-      add(RenderData(mousePos.x.toFloat(),mousePos.y.toFloat(),30f,imgNonQuadrat))
     }.forEach {
         val cache = imgCache[it.imgData] ?: ImgCache().apply {
           imgCache[it.imgData] = this
