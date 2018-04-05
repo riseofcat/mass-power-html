@@ -10,6 +10,7 @@ import org.w3c.dom.events.*
 import util.*
 import kotlin.browser.*
 import kotlin.js.*
+import kotlin.reflect.*
 import org.khronos.webgl.WebGLRenderingContext as WGL
 
 const val FOOD_SCALE = 1.3f
@@ -29,24 +30,25 @@ class FixedWidth(val width:Float,val minHeight:Float,val maxHeight:Float):View()
 data class Attr(val locationName:String,val numElements:Int)
 data class IterAttr(val attr:Attr,val location:Int,val offset:Int)
 class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 width   //todo высчитывать исходя из радиуса обзора
-  val View.gameWidth:Float get() = getWidth(window.innerWidth/window.innerHeight.toFloat())*gameScale
-  val View.gameHeight:Float get() = getHeight(window.innerWidth/window.innerHeight.toFloat())*gameScale
+  val View.gameWidth:Float get() = getWidth(window.innerWidth/window.innerHeight.toFloat())*gameScale.toFloat()
+  val View.gameHeight:Float get() = getHeight(window.innerWidth/window.innerHeight.toFloat())*gameScale.toFloat()
   val View.windowWidth get() = window.innerWidth.min(window.innerHeight*gameWidth/gameHeight)
   val View.windowHeight get() = window.innerHeight.min(window.innerWidth*gameHeight/gameWidth)
   val View.borderLeft get() = (window.innerWidth-windowWidth)/2
   val View.borderTop get() = (window.innerHeight-windowHeight)/2
 
-  val gameScale:Float get() = currentGameScale
-  var currentGameScale = 1f
-  val targetGameScale get():Float {
-    val car = model?.myCar
+  val gameScale by SmoothByRenderCalls {
+    val car = model.myCar
     if(car != null) {
-      val result = 1.5f*lib.Fun.arg0toInf(car.size.radius,GameConst.DEFAULT_CAR_SIZE.radius)+3*lib.Fun.arg0toInf(car.speed.len,1000.0).toFloat()
-      return kotlin.math.max(result,1f)
+      val result = 1.5f*lib.Fun.arg0toInf(car.size.radius,GameConst.DEFAULT_CAR_SIZE.radius)+3*lib.Fun.arg0toInf(car.speed.len,1000.0)
+      return@SmoothByRenderCalls kotlin.math.max(result,1.0)
     } else {
-      return 1f
+      return@SmoothByRenderCalls 1.0
     }
   }
+  val cameraX by SmoothByRenderCalls {model.myCar?.pos?.x}
+  val cameraY by SmoothByRenderCalls {model.myCar?.pos?.y}
+  val cameraGamePos by CacheByRenderCalls {model.myCar?.pos?.copy()?:XY()}
   val html = HTMLElements()
   val gl get() = html.webgl
 //language=GLSL
@@ -136,9 +138,9 @@ void main(void) {
   private val imgCache:MutableMap<ImgData,ImgCache> = hashMapOf()
   var mousePos:XY = XY()
   var model:ClientModel = ClientModel(Conf(5000, "localhost"))
-//  val model:ClientModel? = ClientModel(Conf(5000, "192.168.100.7"))
-//  val model:ClientModel? = ClientModel(Conf(5000, "192.168.43.176"))
-//  val model:ClientModel? = ClientModel(Conf(80, "mass-power.herokuapp.com"))
+//  val model:ClientModel = ClientModel(Conf(5000, "192.168.100.7"))
+//  val model:ClientModel = ClientModel(Conf(5000, "192.168.43.176"))
+//  val model:ClientModel = ClientModel(Conf(80, "mass-power.herokuapp.com"))
 
   init {
     window.onfocus
@@ -210,14 +212,32 @@ void main(void) {
   val imgNonQuadrat = ImgData("img/rect_long.png")
   val colors = listOf(imgRed,imgGreen,imgBlue,imgYellow,imgViolet)
   val PlayerId.color get() = colors.let {it[id%it.size]}
-  var cameraGamePos = XY(0f,0f)
-  var backgroundOffset = XY()
+
+  inner class BackOffset {
+    var previosCameraPos:XY?=null
+    var previousResult:XY=XY()
+    fun getValue(state:State):XY {
+      var result = previousResult
+      previosCameraPos?.let {
+        val change = cameraGamePos-it
+        if(change.x>state.width/2) change.x = change.x-state.width
+        else if(change.x<-state.width/2) change.x = change.x+state.width
+        if(change.y>state.height/2) change.y = change.y-state.height
+        else if(change.y<-state.height/2) change.y = change.y+state.height
+        result += change*0.0001
+      }
+      previousResult = result
+      previosCameraPos = cameraGamePos
+      return result
+    }
+  }
+  val backOffset = BackOffset()
 
   private fun gameLoop(милисекундСоСтараПлюсБездействие:Double):Unit = lib.saveInvoke {
+    onRender()
     fps30 = (fps30*30+1f/(time-previousTime)).toFloat()/(30+1)
     fps500 = (fps500*200+1f/(time-previousTime)).toFloat()/(200+1)
     previousTime = time
-    if(false) resize()
     if(TEXT) {
       val lines:MutableList<String> = mutableListOf()
       lines.add("mouse: ${mousePos}")
@@ -226,6 +246,7 @@ void main(void) {
       lines.add("realtimeTick: " + model?.realtimeTick)
       lines.add("serverTime: " + model?.client?.serverTime?.s)
       lines.add("smartPingDelay: " + model?.client?.smartPingDelay)
+      lines.add("cameraGamePos: " + cameraGamePos)
       if(false)lines.add("size: ${model?.calcDisplayState()?.size}")
       if(false)lines.add("width: ${model?.calcDisplayState()?.width}")
       if(false)lines.add("height: ${model?.calcDisplayState()?.height}")
@@ -237,11 +258,18 @@ void main(void) {
     }
     gl.clearColor(0f,0f,0f,1f)
     gl.clear(WGL.COLOR_BUFFER_BIT)
-    val state = model?.calcDisplayState()
-    currentGameScale+=(targetGameScale - currentGameScale)/30
+    val state = model.calcDisplayState()
+    if(state != null) {
+      model.myCar?.let {
+        setUniformf("u_game_camera_x", it.pos.x.toFloat())
+        setUniformf("u_game_camera_y", it.pos.y.toFloat())
+      }
+      val (offsetX, offsetY) = backOffset.getValue(state)
+      setUniformf("mouse", offsetX.toFloat(), offsetY.toFloat())
+    }
+    setUniformf("resolution", view.windowWidth, view.windowHeight)
     setUniformf("u_game_width", view.gameWidth)
     setUniformf("u_game_height", view.gameHeight)
-    setUniformf("resolution", view.windowWidth, view.windowHeight)
     backgroundShader.activate()
     val pow2in14:Float = 1024f*2*2*2*2
     setUniformf("time", pow2in14 - lib.pillarTimeS(2*pow2in14).toFloat())//lowp от -2.0 до 2.0
@@ -259,21 +287,6 @@ void main(void) {
       if(state != null) {
         if(true) state.reactive.forEach {add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),it.radius,it.owner.color))}
         state.cars.forEach {
-          if(it.owner == model?.welcome?.id) {
-            val prev = cameraGamePos
-            cameraGamePos = it.pos.copy()
-            val change = cameraGamePos - prev
-            if(change.x>state.width/2) change.x = change.x-state.width
-            else if(change.x<-state.width/2) change.x = change.x+state.width
-            if(change.y>state.height/2) change.y = change.y-state.height
-            else if(change.y<-state.height/2) change.y = change.y+state.height
-            backgroundOffset += change*0.0001
-            setUniformf("mouse", backgroundOffset.x.toFloat(), backgroundOffset.y.toFloat())
-
-            //todo дёргается при изменении размера. Как вариант плавно менять через target
-            setUniformf("u_game_camera_x", it.pos.x.toFloat())//todo вынести до начала любого рендеринга
-            setUniformf("u_game_camera_y", it.pos.y.toFloat())
-          }
           add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),it.radius,it.owner.color))
         }
       }
@@ -445,4 +458,34 @@ enum class Mode(val glMode:Int) {
   TRIANGLE(WGL.TRIANGLES),
   TRIANGLE_FAN(WGL.TRIANGLE_FAN),
   TRIANGLE_STRIP(WGL.TRIANGLE_STRIP)
+}
+
+var renderCalls:Int = 0
+fun onRender(){
+  renderCalls++
+}
+class SmoothByRenderCalls<T>(val lambda:()->Double?) {
+  var current:Double? = null
+  var currentRenderCall:Int?=null
+  operator fun getValue(t:T,property:KProperty<*>):Double {
+    if(currentRenderCall != renderCalls) {
+      var result = current?:0.0
+      val target = lambda()
+      if(target != null) {
+        result += (target-result)/30
+      }
+      current = result
+      currentRenderCall = renderCalls
+    }
+    return current?:0.0
+  }
+}
+class CacheByRenderCalls<T,V>(val lambda:()->V) {
+  var cache:V?=null
+  var cachedRenderCall:Int?=null
+  operator fun getValue(t:T,property:KProperty<*>):V =
+    if(cachedRenderCall!=renderCalls||cache==null) lambda().also {
+      cache = it
+      cachedRenderCall=renderCalls
+    } else cache!!
 }
