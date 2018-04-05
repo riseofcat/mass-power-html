@@ -134,7 +134,7 @@ void main(void) {
   val backgroundShader = ShaderFull(ShaderVertex(shader_mesh_default_vert, listOf(Attr("aVertexPosition",2))), shader_background_stars_frag)
   private val imgCache:MutableMap<ImgData,ImgCache> = hashMapOf()
   var mousePos:XY = XY()
-  var model:ClientModel = ClientModel(Conf(5000, "localhost"))
+  var model:ClientModel = ClientModel(Conf(5000, "localhost"), true)
 //  val model:ClientModel = ClientModel(Conf(5000, "192.168.100.7"))
 //  val model:ClientModel = ClientModel(Conf(5000, "192.168.43.176"))
 //  val model:ClientModel = ClientModel(Conf(80, "mass-power.herokuapp.com"))
