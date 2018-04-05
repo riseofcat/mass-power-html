@@ -38,7 +38,15 @@ class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 widt
 
   val gameScale:Float get() = currentGameScale
   var currentGameScale = 1f
-  val targetGameScale get() = model?.myCar?.run {1f + 3 * lib.Fun.arg0toInf(speed.len, 1000.0).toFloat()}?:1f//todo car size
+  val targetGameScale get():Float {
+    val car = model?.myCar
+    if(car != null) {
+      val result = 1.5f*lib.Fun.arg0toInf(car.size.radius,GameConst.DEFAULT_CAR_SIZE.radius)+3*lib.Fun.arg0toInf(car.speed.len,1000.0).toFloat()
+      return kotlin.math.max(result,1f)
+    } else {
+      return 1f
+    }
+  }
   val html = HTMLElements()
   val gl get() = html.webgl
 //language=GLSL
