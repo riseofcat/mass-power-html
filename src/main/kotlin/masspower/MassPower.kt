@@ -261,6 +261,8 @@ void main(void) {
             else if(change.y<-state.height/2) change.y = change.y+state.height
             backgroundOffset += change*0.0001
             setUniformf("mouse", backgroundOffset.x.toFloat(), backgroundOffset.y.toFloat())
+
+            //todo дёргается при изменении размера. Как вариант плавно менять через target
             setUniformf("u_game_camera_x", it.pos.x.toFloat())//todo вынести до начала любого рендеринга
             setUniformf("u_game_camera_y", it.pos.y.toFloat())
           }
