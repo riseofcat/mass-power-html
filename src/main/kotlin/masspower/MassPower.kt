@@ -14,7 +14,6 @@ import kotlin.reflect.*
 import org.khronos.webgl.WebGLRenderingContext as WGL
 
 const val FOOD_SCALE = 1.3f
-const val DYNAMIC_BLEND = true//не влияет на производительность
 const val TEXT = true
 data class ImgData(val url:String)
 class ImgCache(var texture:MassPower.GameTexture? = null)
@@ -149,7 +148,6 @@ void main(void) {
       backgroundShader.activate()
       textureShader.activate()
       gl.enable(WGL.BLEND)
-      if(!DYNAMIC_BLEND) gl.blendFunc(defaultBlend.src.value,defaultBlend.dst.value)
       gameLoop(it)
     }
 
@@ -347,7 +345,7 @@ void main(void) {
     val f7 = fan.getArr(radian10[7])
     val f8 = fan.getArr(radian10[8])
     val f9 = fan.getArr(radian10[9])
-    if(DYNAMIC_BLEND) gl.blendFunc(fan.blend.src.value,fan.blend.dst.value)
+    gl.blendFunc(fan.blend.src.value,fan.blend.dst.value)
     render(Mode.TRIANGLE_FAN,
       x,y,notUsed,r0,*center,
       x,y,radian10[0],gr,*f0,
@@ -374,7 +372,7 @@ void main(void) {
       val s8 = strip.getArr(radian10[8])
       val s9 = strip.getArr(radian10[9])
       val stripRadius = (1f+stripRelativeWidth)*gr
-      if(DYNAMIC_BLEND) gl.blendFunc(strip.blend.src.value,strip.blend.dst.value)
+      gl.blendFunc(strip.blend.src.value,strip.blend.dst.value)
       render(Mode.TRIANGLE_STRIP,
         x,y,radian10[0],gr,*f0,x,y,radian10[0],stripRadius,*s0,
         x,y,radian10[1],gr,*f1,x,y,radian10[1],stripRadius,*s1,
