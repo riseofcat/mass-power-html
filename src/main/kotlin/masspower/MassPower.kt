@@ -46,9 +46,7 @@ class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 widt
       return@SmoothByRenderCalls 1.0
     }
   }
-  val cameraX by SmoothByRenderCalls {model.myCar?.pos?.x}
-  val cameraY by SmoothByRenderCalls {model.myCar?.pos?.y}
-  val cameraGamePos by CacheByRenderCalls {model.myCar?.pos?.copy()?:XY()}
+  val cameraGamePos by CacheByRenderCalls(XY()) {model.myCar?.pos?.copy()}
   val html = HTMLElements()
   val gl get() = html.webgl
 //language=GLSL
@@ -166,7 +164,7 @@ void main(void) {
     }
     document.onclick = fun(event:Event) {
       if(event is MouseEvent) {
-        model?.touch(view screenToGame event.xy)
+        model.touch(view screenToGame event.xy)
       }
     }
     document.onkeypress = fun(event:Event) {
@@ -187,13 +185,14 @@ void main(void) {
   }
 
   private fun resize() {
-    gl.canvas.width = view.gameWidth.toInt()
-    gl.canvas.height = view.gameHeight.toInt()
-    html.canvas2d.canvas.width = view.gameWidth.toInt()
-    html.canvas2d.canvas.height = view.gameHeight.toInt()
-    gl.viewport(0,0,view.gameWidth.toInt(),view.gameHeight.toInt())
+    gl.canvas.width = view.windowWidth.toInt()
+    gl.canvas.height = view.windowWidth.toInt()
+    html.canvas2d.canvas.width = view.windowWidth.toInt()
+    html.canvas2d.canvas.height = view.windowWidth.toInt()
+    gl.viewport(0,0,view.windowWidth.toInt(),view.windowWidth.toInt())
     gl.canvas.setAttribute("style","position: absolute; left: ${view.borderLeft}px; top: ${view.borderTop}px; z-index: 5; width: ${view.windowWidth}px; height: ${view.windowHeight}px;")
     html.canvas2d.canvas.setAttribute("style","position: absolute; left: ${view.borderLeft}px; top: ${view.borderTop}px; z-index: 10; width: ${view.windowWidth}px; height: ${view.windowHeight}px;")
+    setUniformf("resolution", view.windowWidth, view.windowHeight)
   }
 
   val time get() = Date().getTime()/1000f
@@ -243,14 +242,9 @@ void main(void) {
       lines.add("mouse: ${mousePos}")
       lines.add("fps30: $fps30")
       lines.add(Gen.date())
-      lines.add("realtimeTick: " + model?.realtimeTick)
-      lines.add("serverTime: " + model?.client?.serverTime?.s)
-      lines.add("smartPingDelay: " + model?.client?.smartPingDelay)
-      lines.add("cameraGamePos: " + cameraGamePos)
-      if(false)lines.add("size: ${model?.calcDisplayState()?.size}")
-      if(false)lines.add("width: ${model?.calcDisplayState()?.width}")
-      if(false)lines.add("height: ${model?.calcDisplayState()?.height}")
-      if(false)lines.add("targetSize: ${model?.calcDisplayState()?.targetSize}")
+      lines.add("realtimeTick: " +model.realtimeTick)
+      lines.add("serverTime: " +model.client.serverTime.s)
+      lines.add("smartPingDelay: " +model.client.smartPingDelay)
       html.canvas2d.clearRect(0.0,0.0,view.gameWidth.toDouble(),view.gameHeight.toDouble())//todo why gameWidth?
       html.canvas2d.fillStyle = "white"
       html.canvas2d.font = "bold 24pt Arial"
@@ -267,7 +261,6 @@ void main(void) {
       val (offsetX, offsetY) = backOffset.getValue(state)
       setUniformf("mouse", offsetX.toFloat(), offsetY.toFloat())
     }
-    setUniformf("resolution", view.windowWidth, view.windowHeight)
     setUniformf("u_game_width", view.gameWidth)
     setUniformf("u_game_height", view.gameHeight)
     backgroundShader.activate()
@@ -412,14 +405,14 @@ void main(void) {
     gl.drawArrays(mode.glMode,0,allFloatArgsCount/currentShader?.blockSize!!)//todo first, count
   }
 
-  lateinit var currentShader:ShaderFull
+  var currentShader:ShaderFull?=null
   val uniforms:MutableMap<String, FloatArray> = mutableMapOf()
   fun setUniformf(name:String, vararg values:Float) {
     uniforms[name] = values
     _setUniform(name, values)
   }
-  fun _setUniform(name:String, values:FloatArray) {
-    val uniformLocation = gl.getUniformLocation(currentShader.shaderProgram,name)
+  fun _setUniform(name:String, values:FloatArray) = currentShader?.run {
+    val uniformLocation = gl.getUniformLocation(shaderProgram,name)
     when(values.size) {
       1 -> gl.uniform1f(uniformLocation,values[0])
       2 -> gl.uniform2f(uniformLocation,values[0], values[1])
@@ -480,12 +473,12 @@ class SmoothByRenderCalls<T>(val lambda:()->Double?) {
     return current?:0.0
   }
 }
-class CacheByRenderCalls<T,V>(val lambda:()->V) {
+class CacheByRenderCalls<T,V>(val defaultValue:V, val lambda:()->V?) {
   var cache:V?=null
   var cachedRenderCall:Int?=null
   operator fun getValue(t:T,property:KProperty<*>):V =
-    if(cachedRenderCall!=renderCalls||cache==null) lambda().also {
+    if(cachedRenderCall!=renderCalls||cache==null) lambda()?.also {
       cache = it
       cachedRenderCall=renderCalls
-    } else cache!!
+    }?:cache?:defaultValue else cache!!
 }
