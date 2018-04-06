@@ -162,6 +162,7 @@ class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 widt
       lines.add("realtimeTick: " +model.realtimeTick)
       lines.add("serverTime: " +model.client.serverTime.s)
       lines.add("smartPingDelay: " +model.client.smartPingDelay)
+      lines.add("size: " +model.calcDisplayState()?.size)
       html.canvas2d.clearRect(0.0,0.0,view.gameWidth.toDouble(),view.gameHeight.toDouble())//todo why gameWidth?
       html.canvas2d.fillStyle = "white"
       html.canvas2d.font = "bold 24pt Arial"
