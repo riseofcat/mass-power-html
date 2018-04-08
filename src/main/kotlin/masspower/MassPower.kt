@@ -53,10 +53,7 @@ class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 widt
   val backgroundShader = ShaderFull(ShaderVertex(shader_mesh_default_vert, listOf(Attr("aVertexPosition",2))), shader_background_stars_frag)
   private val imgCache:MutableMap<ImgData,ImgCache> = hashMapOf()
   var mousePos:XY = XY()
-  var model:ClientModel = ClientModel(Conf(5000, "localhost"))
-//  val model:ClientModel = ClientModel(Conf(5000, "192.168.100.7"))
-//  val model:ClientModel = ClientModel(Conf(5000, "192.168.43.176"))
-//  val model:ClientModel = ClientModel(Conf(80, "mass-power.herokuapp.com"))
+  val model:ClientModel = ClientModel(confs.current)
 
   init {
     window.onfocus
@@ -197,7 +194,7 @@ class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 widt
     textureShader.activate()
     mutableListOf<RenderData>().apply {
       if(state != null) {
-        if(true) state.reactive.forEach {add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),it.radius,it.owner.color))}
+        state.reactive.forEach {add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),it.radius,it.owner.color))}
         state.cars.forEach {
           add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),it.radius,it.owner.color))
         }
