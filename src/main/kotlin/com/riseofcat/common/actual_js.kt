@@ -89,5 +89,8 @@ actual class Common {
     }
 
     fun Any.callApply(functionName:String,vararg args:Any?):Any? = asDynamic()[functionName]?.apply(this,args)//this.asDynamic().call
+    actual fun random():Double {
+      return Math.random()
+    }
   }
 }
