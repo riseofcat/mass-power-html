@@ -70,7 +70,7 @@ class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 widt
       ))
     } else {
       confs.current.pingClient()
-    }
+    }, slowpoke = false
   )
 
   init {
