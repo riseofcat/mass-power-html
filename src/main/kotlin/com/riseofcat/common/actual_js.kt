@@ -69,7 +69,7 @@ actual class Common {
         val result = (end-start)*1_000_000
         return result.toLong()
       }
-      lib.releae {
+      lib.release {
         val start = lib.time
         block()
         return (lib.time - start).ms*1_000_000

@@ -15,6 +15,7 @@ import org.khronos.webgl.WebGLRenderingContext as WGL
 
 const val FOOD_SCALE = 1.3f
 const val TEXT = true
+const val FAKE_PING = false
 data class ImgData(val url:String)
 class ImgCache(var texture:MassPower.GameTexture? = null)
 data class RenderData(val x:Float,val y:Float,val gameSize:Float,val imgData:ImgData)
@@ -53,7 +54,24 @@ class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 widt
   val backgroundShader = ShaderFull(ShaderVertex(shader_mesh_default_vert, listOf(Attr("aVertexPosition",2))), shader_background_stars_frag)
   private val imgCache:MutableMap<ImgData,ImgCache> = hashMapOf()
   var mousePos:XY = XY()
-  val model:ClientModel = ClientModel(confs.current)
+  val model:ClientModel = ClientModel(
+    if(FAKE_PING) {
+      FakePingClient(ServerPayload(
+        stableTick = Tick(0),
+        welcome = Welcome(PlayerId(1), lib.time),
+        stable = State(mutableListOf(Car(PlayerId(1),20,XY(),XY()))),
+        recommendedLatency = Duration(10),
+        actions = mutableListOf<AllCommand>().apply {
+          for(i in 1..50) {
+            val pid = PlayerId(i+4)
+            add(AllCommand(Tick(i*10),pid, NewCarCommand(pid)))
+          }
+        }
+      ))
+    } else {
+      confs.current.pingClient()
+    }
+  )
 
   init {
     window.onfocus
@@ -157,8 +175,8 @@ class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 widt
       lines.add("fps30: $fps30")
       lines.add(Gen.date())
       lines.add("realtimeTick: " +model.realtimeTick)
-      lines.add("serverTime: " +model.client.serverTime.s)
-      lines.add("smartPingDelay: " +model.client.smartPingDelay)
+      lines.add("serverTime: " +model.ping.serverTime.s)
+      lines.add("smartPingDelay: " +model.ping.smartPingDelay)
       lines.add("size: " +model.calcDisplayState()?.size)
       html.canvas2d.clearRect(0.0,0.0,view.gameWidth.toDouble(),view.gameHeight.toDouble())//todo why gameWidth?
       html.canvas2d.fillStyle = "white"
