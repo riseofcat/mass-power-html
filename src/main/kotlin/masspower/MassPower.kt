@@ -45,10 +45,10 @@ class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 widt
       val result = 1.5f*lib.Fun.arg0toInf(car.size.radius,GameConst.DEFAULT_CAR_SIZE.radius)+3*lib.Fun.arg0toInf(car.speed.len,1000.0)
       return@SmoothByRenderCalls kotlin.math.max(result,1.0)
     } else {
-      return@SmoothByRenderCalls 1.0
+      return@SmoothByRenderCalls 5.0
     }
   }
-  val cameraGamePos by CacheByRenderCalls(XY()) {model.myCar?.pos?.copy()}
+  val cameraGamePos by CacheByRenderCalls(XY()){model.myCar?.pos?.copy()}
   val html = HTMLElements()
   val gl get() = html.webgl
   val textureShader:ShaderFull = ShaderFull(ShaderVertex(MASS_POWER_TEXTURE_VERTEX,listOf(/*Attr("a_center_pos",2),*/ Attr("a_center_x",1),Attr("a_center_y",1),Attr("a_angle",1),Attr("a_game_radius",1),Attr("a_relative_radius",1))),MASS_POWER_TEXTURE_FRAG)
@@ -416,9 +416,12 @@ class SmoothByRenderCalls<T>(val lambda:()->Double?) {
 class CacheByRenderCalls<T,V>(val defaultValue:V, val lambda:()->V?) {
   var cache:V?=null
   var cachedRenderCall:Int?=null
-  operator fun getValue(t:T,property:KProperty<*>):V =
-    if(cachedRenderCall!=renderCalls||cache==null) lambda()?.also {
-      cache = it
+  operator fun getValue(t:T,property:KProperty<*>):V {
+    if(cachedRenderCall!=renderCalls) {
       cachedRenderCall=renderCalls
-    }?:cache?:defaultValue else cache!!
+      cache = lambda()
+    }
+    return cache?:defaultValue
+  }
+
 }
