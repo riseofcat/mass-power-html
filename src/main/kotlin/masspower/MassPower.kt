@@ -16,6 +16,8 @@ import org.khronos.webgl.WebGLRenderingContext as WGL
 const val FOOD_SCALE = 1.3f
 const val TEXT = true
 const val FAKE_PING = false
+const val HIDDEN = false
+const val SLOW_POKE = true
 data class ImgData(val url:String)
 class ImgCache(var texture:MassPower.GameTexture? = null)
 data class RenderData(val x:Float,val y:Float,val gameSize:Float,val imgData:ImgData)
@@ -62,15 +64,15 @@ class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 widt
         stable = State(mutableListOf(Car(PlayerId(1),20,XY(),XY()))),
         recommendedLatency = Duration(10),
         actions = mutableListOf<AllCommand>().apply {
-          for(i in 1..50) {
-            val pid = PlayerId(i+4)
-            add(AllCommand(Tick(i*10),pid, NewCarCommand(pid)))
+          for(i in 2..50) {
+            val pid = PlayerId(i)
+            add(AllCommand(Tick(10+i*1),pid, NewCarCommand(pid)))
           }
         }
       ))
     } else {
       confs.current.pingClient()
-    }, slowpoke = false
+    }, slowpoke = SLOW_POKE
   )
 
   init {
@@ -245,6 +247,10 @@ class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 widt
           }
         }
       }
+    if(HIDDEN) {
+      gl.clearColor(1f,1f,1f,1f)
+      gl.clear(WGL.COLOR_BUFFER_BIT)
+    }
     window.requestAnimationFrame(::gameLoop)
   }
 
