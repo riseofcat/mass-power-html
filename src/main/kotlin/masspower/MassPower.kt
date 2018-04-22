@@ -1,6 +1,7 @@
 package masspower
 
 import com.riseofcat.client.*
+import com.riseofcat.common.*
 import com.riseofcat.lib.*
 import com.riseofcat.share.mass.*
 import kuden.*
@@ -17,7 +18,7 @@ const val FOOD_SCALE = 1.3f
 const val TEXT = true
 const val FAKE_PING = false
 const val HIDDEN = false
-const val SLOW_POKE = true
+const val SLOW_POKE = false
 data class ImgData(val url:String)
 class ImgCache(var texture:MassPower.GameTexture? = null)
 data class RenderData(val x:Float,val y:Float,val gameSize:Float,val imgData:ImgData)
@@ -45,7 +46,7 @@ class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 widt
       val result = 1.5f*lib.Fun.arg0toInf(car.size.radius,GameConst.DEFAULT_CAR_SIZE.radius)+3*lib.Fun.arg0toInf(car.speed.len,1000.0)
       return@SmoothByRenderCalls kotlin.math.max(result,1.0)
     } else {
-      return@SmoothByRenderCalls 5.0
+      return@SmoothByRenderCalls 3.0
     }
   }
   val cameraGamePos by CacheByRenderCalls(XY()){model.myCar?.pos?.copy()}
@@ -56,25 +57,31 @@ class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 widt
   val backgroundShader = ShaderFull(ShaderVertex(shader_mesh_default_vert, listOf(Attr("aVertexPosition",2))), shader_background_stars_frag)
   private val imgCache:MutableMap<ImgData,ImgCache> = hashMapOf()
   var mousePos:XY = XY()
-  val model:ClientModel = ClientModel(
+  val fakePingClient = FakePingClient<ServerPayload,ClientPayload>(ServerPayload(
+    stableTick = Tick(0),
+    welcome = Welcome(PlayerId(1),lib.time),
+    stable = State(mutableListOf(Car(PlayerId(1),GameConst.DEFAULT_CAR_SIZE*3,XY(),XY()))),
+    recommendedLatency = Duration(10),
+    actions = mutableListOf<AllCommand>().apply {
+      for(i in 2..15) {
+        val pid = PlayerId(i)
+        add(AllCommand(Tick(10+i*1),pid,NewCarCommand(pid)))
+      }
+    }
+  ))
+  var model:ClientModel = ClientModel(
     if(FAKE_PING) {
-      FakePingClient(ServerPayload(
-        stableTick = Tick(0),
-        welcome = Welcome(PlayerId(1), lib.time),
-        stable = State(mutableListOf(Car(PlayerId(1),20,XY(),XY()))),
-        recommendedLatency = Duration(10),
-        actions = mutableListOf<AllCommand>().apply {
-          for(i in 2..50) {
-            val pid = PlayerId(i)
-            add(AllCommand(Tick(10+i*1),pid, NewCarCommand(pid)))
-          }
-        }
-      ))
+      fakePingClient
     } else {
       confs.current.pingClient()
     }, slowpoke = SLOW_POKE
   )
 
+  var mouseDown = false
+  infix fun View.screenToGame(screen:XY) = XY(
+    (screen.x-borderLeft)*gameWidth/windowWidth - gameWidth/2 + cameraGamePos.x,
+    gameHeight/2-(screen.y-borderTop)*gameHeight/windowHeight + cameraGamePos.y
+  )
   init {
     window.onfocus
     window.onblur
@@ -87,10 +94,6 @@ class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 widt
       gameLoop(it)
     }
 
-    infix fun View.screenToGame(screen:XY) = XY(
-      (screen.x-borderLeft)*gameWidth/windowWidth - gameWidth/2 + cameraGamePos.x,
-      gameHeight/2-(screen.y-borderTop)*gameHeight/windowHeight + cameraGamePos.y
-    )
     document.onmousemove = fun(event:Event) {
       if(event is MouseEvent) {
         mousePos = view screenToGame event.xy
@@ -100,6 +103,12 @@ class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 widt
       if(event is MouseEvent) {
         model.touch(view screenToGame event.xy)
       }
+    }
+    document.onmousedown = fun(event:Event) {
+      mouseDown = true
+    }
+    document.onmouseup = fun(event:Event) {
+      mouseDown = false
     }
     document.onkeypress = fun(event:Event) {
       if(event is KeyboardEvent) {
@@ -166,20 +175,41 @@ class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 widt
   }
   val backOffset = BackOffset()
 
+  var previousMouseDownHandle = lib.time
   private fun gameLoop(милисекундСоСтараПлюсБездействие:Double):Unit = lib.saveInvoke {
+    if(lib.time > previousMouseDownHandle + Duration(300)) {
+      previousMouseDownHandle = lib.time
+      if(mouseDown) {
+        model.touch(mousePos)
+      }
+    }
     onRender()
     fps30 = (fps30*30+1f/(time-previousTime)).toFloat()/(30+1)
     fps500 = (fps500*200+1f/(time-previousTime)).toFloat()/(200+1)
     previousTime = time
     if(TEXT) {
       val lines:MutableList<String> = mutableListOf()
-      lines.add("mouse: ${mousePos}")
-      lines.add("fps30: $fps30")
-      lines.add(Gen.date())
-      lines.add("realtimeTick: " +model.realtimeTick)
-      lines.add("serverTime: " +model.ping.serverTime.s)
-      lines.add("smartPingDelay: " +model.ping.smartPingDelay)
-      lines.add("size: " +model.calcDisplayState()?.size)
+      if(model.ping is FakePingClient) {
+        lines.add("Сервер не отвечает")
+        lines.add("Наверное попал под блокировку")
+        lines.add("OFFLINE режим")
+      } else {
+        lines.add(model.ping.state.toString())
+        if(!model.ping.state.good) {
+          model.ping.close()
+          model = ClientModel(fakePingClient)
+        }
+      }
+      lines.add("fps: ${lib.formatDouble(fps30.toDouble(), 2)}")
+      if(false) {
+        lines.add("mouse: ${mousePos}")
+        lines.add("fps30: $fps30")
+        lines.add(Gen.date())
+        lines.add("realtimeTick: " +model.realtimeTick)
+        lines.add("serverTime: " +model.ping.serverTime.s)
+        lines.add("smartPingDelay: " +model.ping.smartPingDelay)
+        lines.add("size: " +model.calcDisplayState()?.size)
+      }
       html.canvas2d.clearRect(0.0,0.0,view.gameWidth.toDouble(),view.gameHeight.toDouble())//todo why gameWidth?
       html.canvas2d.fillStyle = "white"
       html.canvas2d.font = "bold 24pt Arial"
@@ -215,7 +245,7 @@ class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 widt
     mutableListOf<RenderData>().apply {
       if(state != null) {
         state.reactive.forEach {add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),it.radius,it.owner.color))}
-        state.cars.forEach {
+        state.cars.apply{sortBy{it.size}}.forEach {//todo сделать более умную сортировку
           add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),it.radius,it.owner.color))
         }
       }

@@ -17,6 +17,7 @@ actual class Common {
     }
 
     actual fun createWebSocket(host:String,port:Int,path:String):LibWebSocket {
+      val createTime = lib.time
       val webSocket = WebSocket("ws://$host:$port/$path")
       webSocket.onopen
       return object:LibWebSocket() {
@@ -40,10 +41,10 @@ actual class Common {
 
         override val state:State
           get() = when(webSocket.readyState) {
-            //0->CONNECTING
+            0.toShort()->if(lib.time-createTime<Duration(10_000)) State.CONNECTING else State.TIMEOUT
             1.toShort()->State.OPEN
-            //2->CLOSING
-            //3->CLOSED
+            2.toShort()->State.CLOSING
+            3.toShort()->State.CLOSED
             else -> State.CLOSE
           }
 
