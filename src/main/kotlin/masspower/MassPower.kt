@@ -1,7 +1,6 @@
 package masspower
 
 import com.riseofcat.client.*
-import com.riseofcat.common.*
 import com.riseofcat.lib.*
 import com.riseofcat.share.mass.*
 import kuden.*
@@ -52,12 +51,16 @@ class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 widt
   val cameraGamePos by CacheByRenderCalls{
     model.myCar?.pos?.copy()?:XY()
   }
+  val cameraGamePos2 by lib.cacheDelegate<XY>{
+    depend{renderCalls}
+    cache {model.myCar?.pos?.copy()?:XY()}
+  }
   val html = HTMLElements()
   val gl get() = html.webgl
   val textureShader:ShaderFull = ShaderFull(ShaderVertex(MASS_POWER_TEXTURE_VERTEX,listOf(/*Attr("a_center_pos",2),*/ Attr("a_center_x",1),Attr("a_center_y",1),Attr("a_angle",1),Attr("a_game_radius",1),Attr("a_relative_radius",1))),MASS_POWER_TEXTURE_FRAG)
   val foodShader:ShaderFull = ShaderFull(ShaderVertex(MASS_POWER_FOOD_VERTEX,listOf(/*Attr("a_center_pos",2),*/ Attr("a_center_x",1),Attr("a_center_y",1),Attr("a_angle",1),Attr("a_game_radius",1),Attr("a_color",4))),MASS_POWER_FOOD_FRAG)
   val backgroundShader = ShaderFull(ShaderVertex(shader_mesh_default_vert, listOf(Attr("aVertexPosition",2))), shader_background_stars_frag)
-  private val imgCache:MutableMap<ImgData,ImgCache> = hashMapOf()
+  private val imgCache:MutableMap<ImgData,ImgCache> = mutableMapOf()
   var mousePos:XY = XY()
   val fakePingClient = FakePingClient<ServerPayload,ClientPayload>(ServerPayload(
     stableTick = Tick(0),
@@ -366,7 +369,7 @@ class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 widt
   inline fun render(mode:Mode,vararg allArgs:Float) = render(mode,allArgs)
   inline fun render(mode:Mode,allArgs:FloatArray) = render(mode,if(true) allArgs as Float32Array else Float32Array(allArgs.toTypedArray()),allArgs.size)
   inline fun MutableList<Float>.vert(vararg args:Float) = addAll(args.toList())//todo check why asList doesn't working
-  inline fun render(mode:Mode,lambda:MutableList<Float>.()->Unit) = render(mode,arrayListOf<Float>().also {it.lambda()}.toFloatArray())
+  inline fun render(mode:Mode,lambda:MutableList<Float>.()->Unit) = render(mode,mutableListOf<Float>().also {it.lambda()}.toFloatArray())
   inline fun render(mode:Mode,mesh:Float32Array,allFloatArgsCount:Int) {
     lib.debug {
       if(allFloatArgsCount<=0) lib.log.error("allFloatArgsCount<=0")
@@ -429,10 +432,10 @@ var renderCalls:Int = 0
 fun onRender(){
   renderCalls++
 }
-class SmoothByRenderCalls<T>(val lambda:()->Double?) {
+class SmoothByRenderCalls(val lambda:()->Double?) {
   var current:Double? = null
   var currentRenderCall:Int?=null
-  operator fun getValue(t:T,property:KProperty<*>):Double {
+  operator fun getValue(t:Any,property:KProperty<*>):Double {
     if(currentRenderCall != renderCalls) {
       var result = current?:0.0
       val target = lambda()
