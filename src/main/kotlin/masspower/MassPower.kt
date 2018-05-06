@@ -49,7 +49,9 @@ class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 widt
       return@SmoothByRenderCalls 3.0
     }
   }
-  val cameraGamePos by CacheByRenderCalls(XY()){model.myCar?.pos?.copy()}
+  val cameraGamePos by CacheByRenderCalls{
+    model.myCar?.pos?.copy()?:XY()
+  }
   val html = HTMLElements()
   val gl get() = html.webgl
   val textureShader:ShaderFull = ShaderFull(ShaderVertex(MASS_POWER_TEXTURE_VERTEX,listOf(/*Attr("a_center_pos",2),*/ Attr("a_center_x",1),Attr("a_center_y",1),Attr("a_angle",1),Attr("a_game_radius",1),Attr("a_relative_radius",1))),MASS_POWER_TEXTURE_FRAG)
@@ -443,15 +445,15 @@ class SmoothByRenderCalls<T>(val lambda:()->Double?) {
     return current?:0.0
   }
 }
-class CacheByRenderCalls<T,V>(val defaultValue:V, val lambda:()->V?) {
-  var cache:V?=null
+class CacheByRenderCalls<T,V:Any>(val lambda:()->V) {
+  lateinit var cache:V
   var cachedRenderCall:Int?=null
   operator fun getValue(t:T,property:KProperty<*>):V {
-    if(cachedRenderCall!=renderCalls) {
+    if(!this::cache.isInitialized || cachedRenderCall!=renderCalls) {
       cachedRenderCall=renderCalls
       cache = lambda()
     }
-    return cache?:defaultValue
+    return cache
   }
 
 }
