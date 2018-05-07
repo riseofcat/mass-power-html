@@ -39,21 +39,13 @@ class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 widt
   val View.borderLeft get() = (window.innerWidth-windowWidth)/2
   val View.borderTop get() = (window.innerHeight-windowHeight)/2
 
-  val gameScale by SmoothByRenderCalls {
-    val car = model.myCar
-    if(car != null) {
-      val result = 1.5f*lib.Fun.arg0toInf(car.size.radius,GameConst.DEFAULT_CAR_SIZE.radius)+3*lib.Fun.arg0toInf(car.speed.len,1000.0)
-      return@SmoothByRenderCalls kotlin.math.max(result,1.0)
-    } else {
-      return@SmoothByRenderCalls 3.0
-    }
-  }
-  val cameraGamePos by CacheByRenderCalls{
-    model.myCar?.pos?.copy()?:XY()
-  }
-  val cameraGamePos2 by lib.cacheDelegate<XY>{
+  val gameScale by SmoothByRenderCalls {targetGameScale}
+  var targetGameScale = 3.0
+  var cameraGamePos = XY()
+  val cameraGamePos2 by CacheByRenderCalls{myCar?.pos?.copy()?:XY()}
+  val cameraGamePos3 by lib.cacheDelegate<XY>{
     depend{renderCalls}
-    cache {model.myCar?.pos?.copy()?:XY()}
+    cache {myCar?.pos?.copy()?:XY()}
   }
   val html = HTMLElements()
   val gl get() = html.webgl
@@ -106,7 +98,7 @@ class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 widt
     }
     document.onclick = fun(event:Event) {
       if(event is MouseEvent) {
-        model.touch(view screenToGame event.xy)
+        model._touch(myCar?.pos, view screenToGame event.xy)
       }
     }
     document.onmousedown = fun(event:Event) {
@@ -181,14 +173,15 @@ class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 widt
   val backOffset = BackOffset()
 
   var previousMouseDownHandle = lib.time
+  var myCar:Car? = null
   private fun gameLoop(милисекундСоСтараПлюсБездействие:Double):Unit = lib.saveInvoke {
     if(lib.time > previousMouseDownHandle + Duration(300)) {
       previousMouseDownHandle = lib.time
       if(mouseDown) {
-        model.touch(mousePos)
+        model._touch(myCar?.pos, mousePos)
       }
     }
-    onRender()
+    if(false)onRender()
     fps30 = (fps30*30+1f/(time-previousTime)).toFloat()/(30+1)
     fps500 = (fps500*200+1f/(time-previousTime)).toFloat()/(200+1)
     previousTime = time
@@ -206,9 +199,8 @@ class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 widt
         }
       }
       lines.add("fps: ${lib.formatDouble(fps30.toDouble(), 2)}")
-      if(false) {
-        lines.add("mouse: ${mousePos}")
-        lines.add("fps30: $fps30")
+      if(true) {
+        if(false) lines.add("mouse: ${mousePos}")
         lines.add(Gen.date())
         lines.add("realtimeTick: " +model.realtimeTick)
         lines.add("serverTime: " +model.ping.serverTime.s)
@@ -223,14 +215,28 @@ class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 widt
     gl.clearColor(0f,0f,0f,1f)
     gl.clear(WGL.COLOR_BUFFER_BIT)
     val state = model.calcDisplayState()
-    if(state != null) {
-      model.myCar?.let {
-        setUniformf("u_game_camera_x", it.pos.x.toFloat())
-        setUniformf("u_game_camera_y", it.pos.y.toFloat())
+    val mutableListOf = mutableListOf<RenderData>()
+    var newCar:Car?=null
+    mutableListOf.apply {
+      if(state != null) {
+        state.reactive.forEach {add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),it.radius,it.owner.color))}
+        state.cars.apply{sortBy{it.size}}.forEach {//todo сделать более умную сортировку
+          if(it.owner == model.welcome?.id) {
+            newCar = myCar
+          }
+          add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),it.radius,it.owner.color))
+        }
+        myCar?.let {
+          setUniformf("u_game_camera_x", it.pos.x.toFloat())
+          setUniformf("u_game_camera_y", it.pos.y.toFloat())
+        }
+        val (offsetX, offsetY) = backOffset.getValue(state)
+        setUniformf("mouse", offsetX.toFloat(), offsetY.toFloat())
       }
-      val (offsetX, offsetY) = backOffset.getValue(state)
-      setUniformf("mouse", offsetX.toFloat(), offsetY.toFloat())
     }
+    myCar = newCar
+    onRender()
+
     setUniformf("u_game_width", view.gameWidth)
     setUniformf("u_game_height", view.gameHeight)
     backgroundShader.activate()
@@ -246,15 +252,9 @@ class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 widt
         renderCircle10(xy.x.toFloat(), xy.y.toFloat(), it.radius*FOOD_SCALE, null,floatArrayOf(1.5f, 1.5f, 1.5f, 1f),fan)
       }
     }
+
     textureShader.activate()
-    mutableListOf<RenderData>().apply {
-      if(state != null) {
-        state.reactive.forEach {add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),it.radius,it.owner.color))}
-        state.cars.apply{sortBy{it.size}}.forEach {//todo сделать более умную сортировку
-          add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),it.radius,it.owner.color))
-        }
-      }
-    }.forEach {
+    mutableListOf.forEach {
         val cache = imgCache[it.imgData] ?: ImgCache().apply {
           imgCache[it.imgData] = this
           val img = document.createElement("img",HTMLImageElement::class)
@@ -420,6 +420,19 @@ class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 widt
       }
     }
   }
+
+  fun onRender() {
+    renderCalls++
+    val car = if(true) myCar else model.myCar
+    if(car!=null) {
+      val result = 1.5f*lib.Fun.arg0toInf(car.size.radius,GameConst.DEFAULT_CAR_SIZE.radius)+3*lib.Fun.arg0toInf(car.speed.len,1000.0)
+      targetGameScale = kotlin.math.max(result,1.0)
+      cameraGamePos = car.pos.copy()
+    } else {
+      targetGameScale = 3.0
+    }
+  }
+
 }
 
 enum class Mode(val glMode:Int) {
@@ -429,9 +442,6 @@ enum class Mode(val glMode:Int) {
 }
 
 var renderCalls:Int = 0
-fun onRender(){
-  renderCalls++
-}
 class SmoothByRenderCalls(val lambda:()->Double?) {
   var current:Double? = null
   var currentRenderCall:Int?=null
@@ -460,3 +470,5 @@ class CacheByRenderCalls<T,V:Any>(val lambda:()->V) {
   }
 
 }
+
+//TODO ЕСЛИ ТУТ ВСЁ ОТКАТИТЬ ТО НЕ ДЁРГАЕТСЯ
