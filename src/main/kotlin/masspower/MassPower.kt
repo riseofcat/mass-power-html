@@ -222,7 +222,7 @@ class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 widt
         state.reactive.forEach {add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),it.radius,it.owner.color))}
         state.cars.apply{sortBy{it.size}}.forEach {//todo сделать более умную сортировку
           if(it.owner == model.welcome?.id) {
-            newCar = myCar
+            newCar = it
           }
           add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),it.radius,it.owner.color))
         }
