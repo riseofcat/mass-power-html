@@ -1,6 +1,8 @@
 package com.riseofcat.common
 
 import com.riseofcat.lib.*
+import kotlinx.io.core.*
+import kotlinx.io.js.*
 import org.w3c.dom.*
 import org.w3c.dom.events.*
 import org.w3c.xhr.*
@@ -23,7 +25,17 @@ actual class Common {
       return object:LibWebSocket() {
         override fun addListener(l:Listener) {
           webSocket.onopen = fun(e:Event) {l.onOpen()}
-          webSocket.onmessage = fun(e:Event){if(e is MessageEvent)l.onMessage(e.data.toString())}
+          webSocket.onmessage = fun(e:Event){
+            if(e is MessageEvent) {
+              if(e.data is CharSequence) {
+                l.onMessage(e.data.toString())
+              } else {
+                e.getPacket{
+                  l.onByteMessage(it.readBytes())
+                }
+              }
+            }
+          }
           webSocket.onclose = fun(e:Event) {l.onClose()}
         }
 
@@ -37,6 +49,12 @@ actual class Common {
 
         override fun send(message:String) {
           webSocket.send(message)
+        }
+
+        override fun sendByte(message:ByteArray) {
+          webSocket.sendPacket(buildPacket {
+            writeFully(message)
+          })
         }
 
         override val state:State
