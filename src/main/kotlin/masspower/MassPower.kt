@@ -217,7 +217,6 @@ class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 widt
     val state = model.calcDisplayState()
     var newCar:Car?=null
     val mutableListOf = mutableListOf<RenderData>().apply {
-      state.reactive.forEach {add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),it.radius,it.owner.color))}
       state.cars.apply{sortBy{it.size}}.forEach {//todo сделать более умную сортировку
         if(it.owner == model.welcome?.id) {
           newCar = it
@@ -242,7 +241,14 @@ class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 widt
     render(Mode.TRIANGLE,-1f,-1f,-1f,1f,1f,-1f,1f,1f,-1f,1f,1f,-1f)
     foodShader.activate()
     val visibleRadius = view.gameWidth*0.75//todo умнее height тоже
-    if(!SIMPLIFY_TEST_PERFORMANCE)state?.foods?.forEach {
+    state?.foods?.forEach {
+      val xy = calcRenderXY(state,XY(it.pos.x,it.pos.y),cameraGamePos)
+      if((cameraGamePos - xy).len <visibleRadius) {//todo высчитывать радиус обзора и применять к cars и reactive
+        val fan = CircleData(defaultBlend){angle-> floatArrayOf(0f, 0f, 0f, 0f)}
+        renderCircle10(xy.x.toFloat(), xy.y.toFloat(), it.radius*FOOD_SCALE, null,floatArrayOf(1.5f, 1.5f, 1.5f, 1f),fan)
+      }
+    }
+    state.reactive.forEach {
       val xy = calcRenderXY(state,XY(it.pos.x,it.pos.y),cameraGamePos)
       if((cameraGamePos - xy).len <visibleRadius) {//todo высчитывать радиус обзора и применять к cars и reactive
         val fan = CircleData(defaultBlend){angle-> floatArrayOf(0f, 0f, 0f, 0f)}
