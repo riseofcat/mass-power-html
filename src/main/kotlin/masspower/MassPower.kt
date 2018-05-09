@@ -17,7 +17,7 @@ const val FOOD_SCALE = 1.3f
 const val TEXT = true
 const val FAKE_PING = false
 const val HIDDEN = false
-const val SLOW_POKE = false
+const val SLOW_POKE = SIMPLIFY_TEST_PERFORMANCE
 data class ImgData(val url:String)
 class ImgCache(var texture:MassPower.GameTexture? = null)
 data class RenderData(val x:Float,val y:Float,val gameSize:Float,val imgData:ImgData)
@@ -245,7 +245,7 @@ class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 widt
     render(Mode.TRIANGLE,-1f,-1f,-1f,1f,1f,-1f,1f,1f,-1f,1f,1f,-1f)
     foodShader.activate()
     val visibleRadius = view.gameWidth*0.75//todo умнее height тоже
-    state?.foods?.forEach {
+    if(!SIMPLIFY_TEST_PERFORMANCE)state?.foods?.forEach {
       val xy = calcRenderXY(state,XY(it.pos.x,it.pos.y),cameraGamePos)
       if((cameraGamePos - xy).len <visibleRadius) {//todo высчитывать радиус обзора и применять к cars и reactive
         val fan = CircleData(defaultBlend){angle-> floatArrayOf(0f, 0f, 0f, 0f)}
