@@ -215,27 +215,24 @@ class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 widt
     gl.clearColor(0f,0f,0f,1f)
     gl.clear(WGL.COLOR_BUFFER_BIT)
     val state = model.calcDisplayState()
-    val mutableListOf = mutableListOf<RenderData>()
     var newCar:Car?=null
-    mutableListOf.apply {
-      if(state != null) {
-        state.reactive.forEach {add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),it.radius,it.owner.color))}
-        state.cars.apply{sortBy{it.size}}.forEach {//todo сделать более умную сортировку
-          if(it.owner == model.welcome?.id) {
-            newCar = it
-          }
-          add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),it.radius,it.owner.color))
+    val mutableListOf = mutableListOf<RenderData>().apply {
+      state.reactive.forEach {add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),it.radius,it.owner.color))}
+      state.cars.apply{sortBy{it.size}}.forEach {//todo сделать более умную сортировку
+        if(it.owner == model.welcome?.id) {
+          newCar = it
         }
-        myCar?.let {
-          setUniformf("u_game_camera_x", it.pos.x.toFloat())
-          setUniformf("u_game_camera_y", it.pos.y.toFloat())
-        }
-        val (offsetX, offsetY) = backOffset.getValue(state)
-        setUniformf("mouse", offsetX.toFloat(), offsetY.toFloat())
+        add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),it.radius,it.owner.color))
       }
     }
     myCar = newCar
     onRender()
+    myCar?.let {
+      setUniformf("u_game_camera_x", cameraGamePos.x.toFloat())
+      setUniformf("u_game_camera_y", cameraGamePos.y.toFloat())
+    }
+    val (offsetX, offsetY) = backOffset.getValue(state)
+    setUniformf("mouse", offsetX.toFloat(), offsetY.toFloat())
 
     setUniformf("u_game_width", view.gameWidth)
     setUniformf("u_game_height", view.gameHeight)
