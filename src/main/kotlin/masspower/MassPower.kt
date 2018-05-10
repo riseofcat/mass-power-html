@@ -215,16 +215,12 @@ class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 widt
     gl.clearColor(0f,0f,0f,1f)
     gl.clear(WGL.COLOR_BUFFER_BIT)
     val state = model.calcDisplayState()
-    var newCar:Car?=null
-    val mutableListOf = mutableListOf<RenderData>().apply {
+    val cars = mutableListOf<RenderData>().apply {
       state.cars.apply{sortBy{it.size}}.forEach {//todo сделать более умную сортировку
-        if(it.owner == model.welcome?.id) {
-          newCar = it
-        }
         add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),it.radius,it.owner.color))
       }
     }
-    myCar = newCar
+    myCar = model.welcome?.id?.let{state.getCar(it)}
     onRender()
     myCar?.let {
       setUniformf("u_game_camera_x", cameraGamePos.x.toFloat())
@@ -241,6 +237,7 @@ class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 widt
     render(Mode.TRIANGLE,-1f,-1f,-1f,1f,1f,-1f,1f,1f,-1f,1f,1f,-1f)
     foodShader.activate()
     val visibleRadius = view.gameWidth*0.75//todo умнее height тоже
+
     state?.foods?.forEach {
       val xy = calcRenderXY(state,XY(it.pos.x,it.pos.y),cameraGamePos)
       if((cameraGamePos - xy).len <visibleRadius) {//todo высчитывать радиус обзора и применять к cars и reactive
@@ -248,6 +245,7 @@ class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 widt
         renderCircle10(xy.x.toFloat(), xy.y.toFloat(), it.radius*FOOD_SCALE, null,floatArrayOf(1.5f, 1.5f, 1.5f, 1f),fan)
       }
     }
+
     state.reactive.forEach {
       val xy = calcRenderXY(state,XY(it.pos.x,it.pos.y),cameraGamePos)
       if((cameraGamePos - xy).len <visibleRadius) {//todo высчитывать радиус обзора и применять к cars и reactive
@@ -257,7 +255,7 @@ class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 widt
     }
 
     textureShader.activate()
-    mutableListOf.forEach {
+    cars.forEach {
         val cache = imgCache[it.imgData] ?: ImgCache().apply {
           imgCache[it.imgData] = this
           val img = document.createElement("img",HTMLImageElement::class)
@@ -279,10 +277,8 @@ class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 widt
         cache.texture?.apply {
           val fan = CircleData(defaultBlend) {angle-> floatArrayOf(1f)}
           val strip = CircleData(stripBlend) {angle-> floatArrayOf(1.75f)}
-          if(state != null) {//todo redundant state!=null
-            val (x,y) = calcRenderXY(state,XY(it.x,it.y),cameraGamePos)
-            renderCircle10(x.toFloat(), y.toFloat(), it.gameSize, glTexture,floatArrayOf(0f),fan,strip)
-          }
+          val (x,y) = calcRenderXY(state,XY(it.x,it.y),cameraGamePos)
+          renderCircle10(x.toFloat(), y.toFloat(), it.gameSize, glTexture,floatArrayOf(0f),fan,strip)
         }
       }
     if(HIDDEN) {
