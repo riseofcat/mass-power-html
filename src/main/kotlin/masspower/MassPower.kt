@@ -17,7 +17,7 @@ const val FOOD_SCALE = 1.3f
 const val TEXT = true
 const val FAKE_PING = false
 const val HIDDEN = false
-const val SLOW_POKE = SIMPLIFY_TEST_PERFORMANCE
+const val SLOW_POKE = false
 data class ImgData(val url:String)
 class ImgCache(var texture:MassPower.GameTexture? = null)
 data class RenderData(val x:Float,val y:Float,val gameSize:Float,val imgData:ImgData)
@@ -31,6 +31,7 @@ class FixedWidth(val width:Float,val minHeight:Float,val maxHeight:Float):View()
 }
 data class Attr(val locationName:String,val numElements:Int)
 data class IterAttr(val attr:Attr,val location:Int,val offset:Int)
+data class Color(val r:Float, val g:Float, val b:Float)
 class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 width
   val View.gameWidth:Float get() = getWidth(window.innerWidth/window.innerHeight.toFloat())*gameScale.toFloat()
   val View.gameHeight:Float get() = getHeight(window.innerWidth/window.innerHeight.toFloat())*gameScale.toFloat()
@@ -48,6 +49,7 @@ class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 widt
   val gl get() = html.webgl
   val textureShader:ShaderFull = ShaderFull(ShaderVertex(MASS_POWER_TEXTURE_VERTEX,listOf(/*Attr("a_center_pos",2),*/ Attr("a_center_x",1),Attr("a_center_y",1),Attr("a_angle",1),Attr("a_game_radius",1),Attr("a_relative_radius",1))),MASS_POWER_TEXTURE_FRAG)
   val foodShader:ShaderFull = ShaderFull(ShaderVertex(MASS_POWER_FOOD_VERTEX,listOf(/*Attr("a_center_pos",2),*/ Attr("a_center_x",1),Attr("a_center_y",1),Attr("a_angle",1),Attr("a_game_radius",1),Attr("a_color",4))),MASS_POWER_FOOD_FRAG)
+  val reactiveShader:ShaderFull = ShaderFull(ShaderVertex(MASS_POWER_REACTIVE_VERTEX,listOf(/*Attr("a_center_pos",2),*/ Attr("a_center_x",1),Attr("a_center_y",1),Attr("a_angle",1),Attr("a_game_radius",1),Attr("a_color",4))),MASS_POWER_FOOD_FRAG)
   val backgroundShader = ShaderFull(ShaderVertex(shader_mesh_default_vert, listOf(Attr("aVertexPosition",2))), shader_background_stars_frag)
   private val imgCache:MutableMap<ImgData,ImgCache> = mutableMapOf()
   var mousePos:XY = XY()
@@ -146,7 +148,14 @@ class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 widt
   val imgViolet = ImgData("img/smiley_small_rect_violet.png")
   val imgGray = ImgData("img/smiley_small_rect_gray.png")
   val imgNonQuadrat = ImgData("img/rect_long.png")
-  val colors = listOf(imgRed,imgGreen,imgBlue,imgYellow,imgViolet)
+  val pngs = listOf(imgRed,imgGreen,imgBlue,imgYellow,imgViolet)
+  val PlayerId.png get() = pngs.let {it[id%it.size]}
+  val red = Color(1f,0f,0f)
+  val green = Color(0f,1f,0f)
+  val blue = Color(0f,0f,1f)
+  val yellow = Color(0.9f,0.9f,0.5f)
+  val violet = Color(0.9f,0.5f,0.9f)
+  val colors = listOf(red, green, blue, yellow, violet)
   val PlayerId.color get() = colors.let {it[id%it.size]}
 
   inner class BackOffset {
@@ -228,24 +237,30 @@ class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 widt
     setUniformf("time", pow2in14 - lib.pillarTimeS(2*pow2in14).toFloat())//lowp от -2.0 до 2.0
     render(Mode.TRIANGLE,-1f,-1f,-1f,1f,1f,-1f,1f,1f,-1f,1f,1f,-1f)
     foodShader.activate()
-    fun filter(obj:SizeObject) = state.distance(cameraGamePos, obj.pos) + obj.radius<(view.gameWidth+view.gameHeight)/2/1.42//todo сделать ограничивающий прямоугольник
-    lib.measure("filter"){state.foods.filter(::filter)}.forEach {
-      val xy = calcRenderXY(state,it.pos,cameraGamePos)
-      val fan = CircleData(defaultBlend){angle-> floatArrayOf(0f, 0f, 0f, 0f)}
-      renderCircle10(xy.x.toFloat(), xy.y.toFloat(), it.radius*FOOD_SCALE, null,floatArrayOf(1.5f, 1.5f, 1.5f, 1f),fan)
-    }
-    lib.measure("filter"){state.reactive.filter(::filter)}.forEach {
+    val filterRadius = (view.gameWidth+view.gameHeight)/2/1.42
+    /*todo inline*/ fun filter(obj:SizeObject) = state.distance(cameraGamePos,obj.pos)-obj.radius<filterRadius//todo сделать ограничивающий прямоугольник
+    state.foods.asSequence().filter(::filter).forEach {
       val xy = calcRenderXY(state,it.pos,cameraGamePos)
       val fan = CircleData(defaultBlend){angle-> floatArrayOf(0f, 0f, 0f, 0f)}
       renderCircle10(xy.x.toFloat(), xy.y.toFloat(), it.radius*FOOD_SCALE, null,floatArrayOf(1.5f, 1.5f, 1.5f, 1f),fan)
     }
 
+    reactiveShader.activate()
+    state.reactive.asSequence().filter(::filter).forEach {
+      val clr = it.owner.color
+      val xy = calcRenderXY(state,it.pos,cameraGamePos)
+      val fan = CircleData(defaultBlend){angle-> floatArrayOf(0f, 0f, 0f, 0f)}
+      renderCircle10(xy.x.toFloat(), xy.y.toFloat(), it.radius*FOOD_SCALE, null,floatArrayOf(clr.r, clr.g, clr.b, 1f),fan)
+    }
+
     textureShader.activate()
-    lib.measure("filter"){state.cars.filter(::filter)}
-      .toMutableList()
-      .apply{sortBy{it.size}}//todo сделать более умную сортировку чтобы не каждый кадр
-      .forEach {car->
-      val rd = RenderData(car.pos.x.toFloat(),car.pos.y.toFloat(),car.radius,car.owner.color)
+    val filtered = lib.measure("filter") {state.cars.filter(::filter)}
+    lib.measure("sort cars") {
+      filtered
+        .toMutableList()
+        .apply{sortBy{it.size}}//todo сделать более умную сортировку чтобы не каждый кадр
+    }.forEach {car->
+      val rd = RenderData(car.pos.x.toFloat(),car.pos.y.toFloat(),car.radius,car.owner.png)
       val cache = imgCache[rd.imgData] ?: ImgCache().apply {
         imgCache[rd.imgData] = this
         val img = document.createElement("img",HTMLImageElement::class)
