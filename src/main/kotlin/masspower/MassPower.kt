@@ -41,12 +41,9 @@ class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 widt
 
   val gameScale by SmoothByRenderCalls {targetGameScale}
   var targetGameScale = 3.0
-  var cameraGamePos = XY()
-  val cameraGamePos2 by CacheByRenderCalls{myCar?.pos?.copy()?:XY()}
-  val cameraGamePos3 by lib.cacheDelegate<XY>{
-    depend{renderCalls}
-    cache {myCar?.pos?.copy()?:XY()}
-  }
+  var myCar:Car? = null
+  var previousCameraPos = XY()
+  val cameraGamePos get() = myCar?.pos?.also {previousCameraPos = it} ?: previousCameraPos
   val html = HTMLElements()
   val gl get() = html.webgl
   val textureShader:ShaderFull = ShaderFull(ShaderVertex(MASS_POWER_TEXTURE_VERTEX,listOf(/*Attr("a_center_pos",2),*/ Attr("a_center_x",1),Attr("a_center_y",1),Attr("a_angle",1),Attr("a_game_radius",1),Attr("a_relative_radius",1))),MASS_POWER_TEXTURE_FRAG)
@@ -153,27 +150,28 @@ class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 widt
   val PlayerId.color get() = colors.let {it[id%it.size]}
 
   inner class BackOffset {
-    var previosCameraPos:XY?=null
+    var previousRelativeCameraPos:XY?=null
     var previousResult:XY=XY()
     fun getValue(state:State):XY {
       var result = previousResult
-      previosCameraPos?.let {
-        val change = cameraGamePos-it
-        if(change.x>state.width/2) change.x = change.x-state.width
-        else if(change.x<-state.width/2) change.x = change.x+state.width
-        if(change.y>state.height/2) change.y = change.y-state.height
-        else if(change.y<-state.height/2) change.y = change.y+state.height
-        result += change*0.0001
+      val relativeCameraPos = cameraGamePos.scale(XY(1/state.width,1/state.height))
+      previousRelativeCameraPos?.let {
+        val change = relativeCameraPos-it
+        if(change.x>0.5) change.x = change.x-1
+        else if(change.x<-0.5) change.x = change.x+1
+        if(change.y>0.5) change.y = change.y-1
+        else if(change.y<-0.5) change.y = change.y+1
+        result += change*0.3//скорость задника
       }
       previousResult = result
-      previosCameraPos = cameraGamePos
+      previousRelativeCameraPos = relativeCameraPos
       return result
     }
   }
   val backOffset = BackOffset()
 
   var previousMouseDownHandle = lib.time
-  var myCar:Car? = null
+
   private fun gameLoop(милисекундСоСтараПлюсБездействие:Double):Unit = lib.saveInvoke {
     if(lib.time > previousMouseDownHandle + Duration(300)) {
       previousMouseDownHandle = lib.time
@@ -215,11 +213,6 @@ class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 widt
     gl.clearColor(0f,0f,0f,1f)
     gl.clear(WGL.COLOR_BUFFER_BIT)
     val state = model.calcDisplayState()
-    val cars = mutableListOf<RenderData>().apply {
-      state.cars.apply{sortBy{it.size}}.forEach {//todo сделать более умную сортировку
-        add(RenderData(it.pos.x.toFloat(),it.pos.y.toFloat(),it.radius,it.owner.color))
-      }
-    }
     myCar = model.welcome?.id?.let{state.getCar(it)}
     onRender()
     myCar?.let {
@@ -228,7 +221,6 @@ class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 widt
     }
     val (offsetX, offsetY) = backOffset.getValue(state)
     setUniformf("mouse", offsetX.toFloat(), offsetY.toFloat())
-
     setUniformf("u_game_width", view.gameWidth)
     setUniformf("u_game_height", view.gameHeight)
     backgroundShader.activate()
@@ -236,51 +228,49 @@ class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 widt
     setUniformf("time", pow2in14 - lib.pillarTimeS(2*pow2in14).toFloat())//lowp от -2.0 до 2.0
     render(Mode.TRIANGLE,-1f,-1f,-1f,1f,1f,-1f,1f,1f,-1f,1f,1f,-1f)
     foodShader.activate()
-    val visibleRadius = view.gameWidth*0.75//todo умнее height тоже
-
-    state?.foods?.forEach {
-      val xy = calcRenderXY(state,XY(it.pos.x,it.pos.y),cameraGamePos)
-      if((cameraGamePos - xy).len <visibleRadius) {//todo высчитывать радиус обзора и применять к cars и reactive
-        val fan = CircleData(defaultBlend){angle-> floatArrayOf(0f, 0f, 0f, 0f)}
-        renderCircle10(xy.x.toFloat(), xy.y.toFloat(), it.radius*FOOD_SCALE, null,floatArrayOf(1.5f, 1.5f, 1.5f, 1f),fan)
-      }
+    fun filter(obj:SizeObject) = state.distance(cameraGamePos, obj.pos) + obj.radius<(view.gameWidth+view.gameHeight)/2/1.42//todo сделать ограничивающий прямоугольник
+    lib.measure("filter"){state.foods.filter(::filter)}.forEach {
+      val xy = calcRenderXY(state,it.pos,cameraGamePos)
+      val fan = CircleData(defaultBlend){angle-> floatArrayOf(0f, 0f, 0f, 0f)}
+      renderCircle10(xy.x.toFloat(), xy.y.toFloat(), it.radius*FOOD_SCALE, null,floatArrayOf(1.5f, 1.5f, 1.5f, 1f),fan)
     }
-
-    state.reactive.forEach {
-      val xy = calcRenderXY(state,XY(it.pos.x,it.pos.y),cameraGamePos)
-      if((cameraGamePos - xy).len <visibleRadius) {//todo высчитывать радиус обзора и применять к cars и reactive
-        val fan = CircleData(defaultBlend){angle-> floatArrayOf(0f, 0f, 0f, 0f)}
-        renderCircle10(xy.x.toFloat(), xy.y.toFloat(), it.radius*FOOD_SCALE, null,floatArrayOf(1.5f, 1.5f, 1.5f, 1f),fan)
-      }
+    lib.measure("filter"){state.reactive.filter(::filter)}.forEach {
+      val xy = calcRenderXY(state,it.pos,cameraGamePos)
+      val fan = CircleData(defaultBlend){angle-> floatArrayOf(0f, 0f, 0f, 0f)}
+      renderCircle10(xy.x.toFloat(), xy.y.toFloat(), it.radius*FOOD_SCALE, null,floatArrayOf(1.5f, 1.5f, 1.5f, 1f),fan)
     }
 
     textureShader.activate()
-    cars.forEach {
-        val cache = imgCache[it.imgData] ?: ImgCache().apply {
-          imgCache[it.imgData] = this
-          val img = document.createElement("img",HTMLImageElement::class)
-          img.onload = {
-            val texture = gl.createTexture() ?: lib.log.fatalError("Couldn't create webgl texture!")
-            gl.bindTexture(WGL.TEXTURE_2D,texture)
-            gl.pixelStorei(WGL.UNPACK_FLIP_Y_WEBGL,1) // second argument must be an int
-            gl.texImage2D(WGL.TEXTURE_2D,0,WGL.RGBA,WGL.RGBA,WGL.UNSIGNED_BYTE,img)
-            gl.texParameteri(WGL.TEXTURE_2D,WGL.TEXTURE_MAG_FILTER,WGL.NEAREST)//LINEAR
-            gl.texParameteri(WGL.TEXTURE_2D,WGL.TEXTURE_MIN_FILTER,WGL.NEAREST)
-            gl.texParameteri(WGL.TEXTURE_2D,WGL.TEXTURE_WRAP_T,WGL.CLAMP_TO_EDGE)
-            gl.texParameteri(WGL.TEXTURE_2D,WGL.TEXTURE_WRAP_S,WGL.CLAMP_TO_EDGE)
-            gl.bindTexture(WGL.TEXTURE_2D,null)//зануляем текстуру чтобы её настройки уже зафиксировать и случайно не изменить
-            this.texture = GameTexture(texture,img.width,img.height)
-            null
-          }
-          img.src = it.imgData.url
+    lib.measure("filter"){state.cars.filter(::filter)}
+      .toMutableList()
+      .apply{sortBy{it.size}}//todo сделать более умную сортировку чтобы не каждый кадр
+      .forEach {car->
+      val rd = RenderData(car.pos.x.toFloat(),car.pos.y.toFloat(),car.radius,car.owner.color)
+      val cache = imgCache[rd.imgData] ?: ImgCache().apply {
+        imgCache[rd.imgData] = this
+        val img = document.createElement("img",HTMLImageElement::class)
+        img.onload = {
+          val texture = gl.createTexture() ?: lib.log.fatalError("Couldn't create webgl texture!")
+          gl.bindTexture(WGL.TEXTURE_2D,texture)
+          gl.pixelStorei(WGL.UNPACK_FLIP_Y_WEBGL,1) // second argument must be an int
+          gl.texImage2D(WGL.TEXTURE_2D,0,WGL.RGBA,WGL.RGBA,WGL.UNSIGNED_BYTE,img)
+          gl.texParameteri(WGL.TEXTURE_2D,WGL.TEXTURE_MAG_FILTER,WGL.NEAREST)//LINEAR
+          gl.texParameteri(WGL.TEXTURE_2D,WGL.TEXTURE_MIN_FILTER,WGL.NEAREST)
+          gl.texParameteri(WGL.TEXTURE_2D,WGL.TEXTURE_WRAP_T,WGL.CLAMP_TO_EDGE)
+          gl.texParameteri(WGL.TEXTURE_2D,WGL.TEXTURE_WRAP_S,WGL.CLAMP_TO_EDGE)
+          gl.bindTexture(WGL.TEXTURE_2D,null)//зануляем текстуру чтобы её настройки уже зафиксировать и случайно не изменить
+          this.texture = GameTexture(texture,img.width,img.height)
+          null
         }
-        cache.texture?.apply {
-          val fan = CircleData(defaultBlend) {angle-> floatArrayOf(1f)}
-          val strip = CircleData(stripBlend) {angle-> floatArrayOf(1.75f)}
-          val (x,y) = calcRenderXY(state,XY(it.x,it.y),cameraGamePos)
-          renderCircle10(x.toFloat(), y.toFloat(), it.gameSize, glTexture,floatArrayOf(0f),fan,strip)
-        }
+        img.src = rd.imgData.url
       }
+      cache.texture?.apply {
+        val fan = CircleData(defaultBlend) {angle-> floatArrayOf(1f)}
+        val strip = CircleData(stripBlend) {angle-> floatArrayOf(1.75f)}
+        val (x,y) = calcRenderXY(state,XY(rd.x,rd.y),cameraGamePos)
+        renderCircle10(x.toFloat(), y.toFloat(), rd.gameSize, glTexture,floatArrayOf(0f),fan,strip)
+      }
+    }
     if(HIDDEN) {
       gl.clearColor(1f,1f,1f,1f)
       gl.clear(WGL.COLOR_BUFFER_BIT)
@@ -426,7 +416,6 @@ class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 widt
     if(car!=null) {
       val result = 1.5f*lib.Fun.arg0toInf(car.size.radius,GameConst.DEFAULT_CAR_SIZE.radius)+3*lib.Fun.arg0toInf(car.speed.len,1000.0)
       targetGameScale = kotlin.math.max(result,1.0)
-      cameraGamePos = car.pos.copy()
     } else {
       targetGameScale = 3.0
     }
