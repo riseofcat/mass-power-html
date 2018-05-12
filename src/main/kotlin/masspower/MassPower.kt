@@ -44,7 +44,7 @@ class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 widt
   var targetGameScale = 3.0
   var myCar:Car? = null
   var previousCameraPos = XY()
-  val cameraGamePos get() = myCar?.pos?.also {previousCameraPos = it} ?: previousCameraPos
+  inline val cameraGamePos get() = myCar?.pos?.also {previousCameraPos = it} ?: previousCameraPos
   val html = HTMLElements()
   val gl get() = html.webgl
   val textureShader:ShaderFull = ShaderFull(ShaderVertex(MASS_POWER_TEXTURE_VERTEX,listOf(/*Attr("a_center_pos",2),*/ Attr("a_center_x",1),Attr("a_center_y",1),Attr("a_angle",1),Attr("a_game_radius",1),Attr("a_relative_radius",1))),MASS_POWER_TEXTURE_FRAG)
@@ -238,23 +238,21 @@ class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 widt
     render(Mode.TRIANGLE,-1f,-1f,-1f,1f,1f,-1f,1f,1f,-1f,1f,1f,-1f)
     foodShader.activate()
     val filterRadius = (view.gameWidth+view.gameHeight)/2/1.42
-    /*todo inline*/ fun filter(obj:SizeObject) = state.distance(cameraGamePos,obj.pos)-obj.radius<filterRadius//todo сделать ограничивающий прямоугольник
-    state.foods.asSequence().filter(::filter).forEach {
+    state.foods.asSequence().filter{state.distance(cameraGamePos,it.pos)<filterRadius}.forEach {
       val xy = calcRenderXY(state,it.pos,cameraGamePos)
       val fan = CircleData(defaultBlend){angle-> floatArrayOf(0f, 0f, 0f, 0f)}
       renderCircle10(xy.x.toFloat(), xy.y.toFloat(), it.radius*FOOD_SCALE, null,floatArrayOf(1.5f, 1.5f, 1.5f, 1f),fan)
     }
-
     reactiveShader.activate()
-    state.reactive.asSequence().filter(::filter).forEach {
+    state.reactive.asSequence().filter{state.distance(cameraGamePos,it.pos)<filterRadius}.forEach {
       val clr = it.owner.color
       val xy = calcRenderXY(state,it.pos,cameraGamePos)
       val fan = CircleData(defaultBlend){angle-> floatArrayOf(0f, 0f, 0f, 0f)}
-      renderCircle10(xy.x.toFloat(), xy.y.toFloat(), it.radius*FOOD_SCALE, null,floatArrayOf(clr.r, clr.g, clr.b, 1f),fan)
+      renderCircle10(xy.x.toFloat(), xy.y.toFloat(), it.radius*1.43f, null,floatArrayOf(clr.r, clr.g, clr.b, 1f),fan)
     }
 
     textureShader.activate()
-    val filtered = lib.measure("filter") {state.cars.filter(::filter)}
+    val filtered = lib.measure("filter") {state.cars.filter{state.distance(cameraGamePos,it.pos)-it.radius<filterRadius}}
     lib.measure("sort cars") {
       filtered
         .toMutableList()
