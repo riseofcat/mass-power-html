@@ -206,7 +206,7 @@ class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 widt
         }
       }
       lines.add("fps: ${lib.formatDouble(fps30.toDouble(), 2)}")
-      if(true) {
+      if(false) {
         if(false) lines.add("mouse: ${mousePos}")
         lines.add(Gen.date())
         lines.add("realtimeTick: " +model.realtimeTick)

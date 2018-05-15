@@ -1,5 +1,7 @@
 package domain
 
+import com.riseofcat.common.*
+import com.riseofcat.lib.*
 import com.riseofcat.share.*
 import kotlinx.serialization.*
 import org.khronos.webgl.*
@@ -847,6 +849,33 @@ fun testFirst() {
     val boxedData2 = kotlinx.serialization.json.JSON.parse(boxedDataSerial,str)
     println("boxedData2.boxed.a = ${boxedData2.boxed.a}")
     if(boxedData == boxedData2) println("boxedData == boxedData2")
+  }.e {
+    val SIZE = 2000
+    val arr:Array<Array<Int>> = Array(SIZE) {
+      Array(SIZE) {
+        lib.rnd(1,2)
+      }
+    }
+    var sum = 0
+    val timeA = Common.measureNanoTime {
+      for(i1 in 0 until SIZE) {
+        for(i2 in 0 until SIZE) {
+          sum += arr[i1][i2]
+        }
+      }
+    }
+    sum = 0
+    val timeB = Common.measureNanoTime {
+      for(i1 in 0 until SIZE) {
+        for(i2 in 0 until SIZE) {
+          sum += arr[i2][i1]
+        }
+      }
+    }
+    println("timeA: $timeA")
+    println("timeB: $timeB")
+    println("timeB/timeA: ${timeB/timeA}")
+    breakpoint()
   }
 }
 
