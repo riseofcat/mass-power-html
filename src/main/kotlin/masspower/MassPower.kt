@@ -56,13 +56,14 @@ class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 widt
   val fakePingClient = FakePingClient<ServerPayload,ClientPayload>(ServerPayload(
     stableTick = Tick(0),
     welcome = Welcome(PlayerId(1),lib.time),
-    stable = State(mutableListOf(Car(PlayerId(1),GameConst.DEFAULT_CAR_SIZE*3,XY(),XY()))),
-    recommendedLatency = Duration(10),
-    actions = mutableListOf<AllCommand>().apply {
-      for(i in 2..15) {
-        val pid = PlayerId(i)
-        add(AllCommand(Tick(10+i*1),pid,NewCarCommand(pid)))
-      }
+    stable = State(
+      cars = mutableListOf(Car(PlayerId(1),GameConst.DEFAULT_CAR_SIZE*3,XY(),XY()))),
+      recommendedLatency = Duration(10),
+      actions = mutableListOf<AllCommand>().apply {
+        for(i in 2..100) {
+          val pid = PlayerId(i)
+          add(AllCommand(Tick(10+i*1),pid,NewCarCommand(pid)))
+        }
     }
   ))
   var model:ClientModel = ClientModel(
@@ -110,9 +111,16 @@ class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 widt
       if(event is KeyboardEvent) {
         val code = event.keyCode
         val key = Key.getByCode(code)
+        when(key) {
+          Key.MINUS->userScale*=1.3
+          Key.PLUS->userScale/=1.3
+        }
+
       }
     }
   }
+
+  var userScale = 1.0
 
   val MouseEvent.xy get() = XY(getX(html.container), getY(html.container))
 
@@ -163,7 +171,7 @@ class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 widt
     var previousResult:XY=XY()
     fun getValue(state:State):XY {
       var result = previousResult
-      val relativeCameraPos = cameraGamePos.scale(XY(1/state.width,1/state.height))
+      val relativeCameraPos = cameraGamePos.scale(XY(1/state.width.toDouble(),1/state.height.toDouble()))
       previousRelativeCameraPos?.let {
         val change = relativeCameraPos-it
         if(change.x>0.5) change.x = change.x-1
@@ -192,12 +200,17 @@ class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 widt
     fps30 = (fps30*30+1f/(time-previousTime)).toFloat()/(30+1)
     fps500 = (fps500*200+1f/(time-previousTime)).toFloat()/(200+1)
     previousTime = time
+
+    val state = model.calcDisplayState()
+
     if(TEXT) {
       val lines:MutableList<String> = mutableListOf()
       if(model.ping is FakePingClient) {
-        lines.add("Сервер не отвечает")
-        lines.add("Наверное попал под блокировку")
-        lines.add("OFFLINE режим")
+        lib.release {
+          lines.add("Сервер не отвечает")
+          lines.add("Наверное попал под блокировку")
+          lines.add("OFFLINE режим")
+        }
       } else {
         lines.add(model.ping.state.toString())
         if(!model.ping.state.good) {
@@ -206,13 +219,14 @@ class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 widt
         }
       }
       lines.add("fps: ${lib.formatDouble(fps30.toDouble(), 2)}")
-      if(false) {
+      lib.debug {
         if(false) lines.add("mouse: ${mousePos}")
         lines.add(Gen.date())
-        lines.add("realtimeTick: " +model.realtimeTick)
-        lines.add("serverTime: " +model.ping.serverTime.s)
-        lines.add("smartPingDelay: " +model.ping.smartPingDelay)
-        lines.add("size: " +model.calcDisplayState()?.size)
+        if(false)lines.add("realtimeTick: " +model.realtimeTick)
+        if(false)lines.add("serverTime: " +model.ping.serverTime.s)
+        if(false)lines.add("smartPingDelay: " +model.ping.smartPingDelay)
+        lines.add("size: ${state.size}")
+        lines.add("foods: ${state.foods.size}")
       }
       html.canvas2d.clearRect(0.0,0.0,view.gameWidth.toDouble(),view.gameHeight.toDouble())//todo why gameWidth?
       html.canvas2d.fillStyle = "white"
@@ -221,7 +235,6 @@ class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 widt
     }
     gl.clearColor(0f,0f,0f,1f)
     gl.clear(WGL.COLOR_BUFFER_BIT)
-    val state = model.calcDisplayState()
     myCar = model.welcome?.id?.let{state.getCar(it)}
     onRender()
     myCar?.let {
@@ -428,9 +441,9 @@ class MassPower(val view:View = FixedWidth(1000f,1000f,1000f)) {//todo 1500 widt
     val car = if(true) myCar else model.myCar
     if(car!=null) {
       val result = 1.5f*lib.Fun.arg0toInf(car.size.radius,GameConst.DEFAULT_CAR_SIZE.radius)+3*lib.Fun.arg0toInf(car.speed.len,1000.0)
-      targetGameScale = kotlin.math.max(result,1.0)
+      targetGameScale = kotlin.math.max(result,1.0) * userScale
     } else {
-      targetGameScale = 3.0
+      targetGameScale = 3.0  * userScale
     }
   }
 
